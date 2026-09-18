@@ -8,7 +8,7 @@ const EventEmitter = require('events');
 const DEFAULT_TCP_PORT = 8765;
 const DEFAULT_UDP_PORT = 8766;
 const MULTICAST_ADDR = '239.255.43.21';
-const CHUNK_SIZE = 64 * 1024; // 64 KB
+const CHUNK_SIZE = 2 * 1024 * 1024; // 2 MB ultra high-throughput chunks for >1 Gbps line rates
 
 class NetworkController extends EventEmitter {
     constructor() {
@@ -273,6 +273,9 @@ class NetworkController extends EventEmitter {
     // ==========================================
     _startTCPServer() {
         this.tcpServer = net.createServer((socket) => {
+            socket.setNoDelay(true);
+            socket.setKeepAlive(true, 10000);
+
             const remoteIp = socket.remoteAddress?.replace(/^.*:/, '') || 'unknown';
             if (remoteIp !== 'unknown') {
                 this.activeSockets.set(remoteIp, socket);
@@ -283,40 +286,43 @@ class NetworkController extends EventEmitter {
 
             socket.on('data', (chunk) => {
                 if (receivingFile) {
-                    // Direct binary file chunk stream
-                    receivingFile.writeStream.write(chunk);
+                    // Direct binary stream with strict backpressure to support >5GB files without memory exhaustion
+                    const canContinue = receivingFile.writeStream.write(chunk);
                     receivingFile.receivedBytes += chunk.length;
 
                     const now = Date.now();
-                    const elapsedSec = (now - receivingFile.startTime) / 1000;
-                    const speedMBps = elapsedSec > 0 ? (receivingFile.receivedBytes / (1024 * 1024)) / elapsedSec : 0;
-                    const percent = Math.min(100, Math.round((receivingFile.receivedBytes / receivingFile.totalBytes) * 100));
+                    const isDone = receivingFile.receivedBytes >= receivingFile.totalBytes;
 
-                    this.emit('file-progress', {
-                        fileId: receivingFile.fileId,
-                        fileName: receivingFile.fileName,
-                        totalBytes: receivingFile.totalBytes,
-                        bytesTransferred: receivingFile.receivedBytes,
-                        percent: percent,
-                        speedMBps: speedMBps.toFixed(2),
-                        isComplete: false,
-                        isSender: false,
-                        savePath: receivingFile.savePath
-                    });
+                    // Throttle IPC events to 10/sec to prevent freezing Electron process
+                    if (now - (receivingFile.lastProgressEmitTime || 0) >= 100 || isDone) {
+                        receivingFile.lastProgressEmitTime = now;
+                        const elapsedSec = (now - receivingFile.startTime) / 1000;
+                        const speedMBps = elapsedSec > 0 ? (receivingFile.receivedBytes / (1024 * 1024)) / elapsedSec : 0;
+                        const percent = Math.min(100, Math.round((receivingFile.receivedBytes / receivingFile.totalBytes) * 100));
 
-                    if (receivingFile.receivedBytes >= receivingFile.totalBytes) {
-                        receivingFile.writeStream.end();
                         this.emit('file-progress', {
                             fileId: receivingFile.fileId,
                             fileName: receivingFile.fileName,
                             totalBytes: receivingFile.totalBytes,
                             bytesTransferred: receivingFile.receivedBytes,
-                            percent: 100,
+                            percent: percent,
                             speedMBps: speedMBps.toFixed(2),
-                            isComplete: true,
+                            isComplete: isDone,
                             isSender: false,
                             savePath: receivingFile.savePath
                         });
+                    }
+
+                    // Apply socket backpressure: pause socket if disk write buffer is full
+                    if (!canContinue) {
+                        socket.pause();
+                        receivingFile.writeStream.once('drain', () => {
+                            socket.resume();
+                        });
+                    }
+
+                    if (isDone) {
+                        receivingFile.writeStream.end();
                         receivingFile = null;
                         socket.end();
                     }
@@ -336,6 +342,19 @@ class NetworkController extends EventEmitter {
                         const packet = JSON.parse(line);
                         this._handleTCPPacket(packet, socket, remoteIp, (fileHandler) => {
                             receivingFile = fileHandler;
+                            // Flush any leftover binary chunk in buffer to file stream
+                            if (buffer.length > 0) {
+                                const leftover = buffer;
+                                buffer = Buffer.alloc(0);
+                                const canCont = receivingFile.writeStream.write(leftover);
+                                receivingFile.receivedBytes += leftover.length;
+                                if (!canCont) {
+                                    socket.pause();
+                                    receivingFile.writeStream.once('drain', () => {
+                                        socket.resume();
+                                    });
+                                }
+                            }
                         });
                     } catch (err) {
                         console.error('[TCP] JSON parse error:', err);
@@ -463,7 +482,8 @@ class NetworkController extends EventEmitter {
             const { fileId, fileName, fileSize } = packet;
             const safeName = path.basename(fileName);
             const savePath = path.join(this.downloadsDir, safeName);
-            const writeStream = fs.createWriteStream(savePath);
+            // 2MB highWaterMark for direct ultra-fast disk writing
+            const writeStream = fs.createWriteStream(savePath, { highWaterMark: CHUNK_SIZE });
 
             setFileHandler({
                 fileId,
@@ -471,6 +491,7 @@ class NetworkController extends EventEmitter {
                 totalBytes: fileSize,
                 receivedBytes: 0,
                 startTime: Date.now(),
+                lastProgressEmitTime: 0,
                 savePath,
                 writeStream
             });
@@ -908,11 +929,16 @@ class NetworkController extends EventEmitter {
             const id = fileId || crypto.randomUUID();
 
             const client = new net.Socket();
+            // Turbo socket configuration for >1 Gbps line rates
+            client.setNoDelay(true);
+            client.setKeepAlive(true, 10000);
+
             let sentBytes = 0;
-            const startTime = Date.now();
+            let startTime = 0;
+            let lastProgressEmitTime = 0;
 
             client.connect(targetPort, targetIp, () => {
-                // Send file header
+                // Send file header with exact 64-bit byte size (supports >5GB, 10GB, 50GB+)
                 const header = JSON.stringify({
                     type: 'file_header',
                     fileId: id,
@@ -923,29 +949,44 @@ class NetworkController extends EventEmitter {
             });
 
             client.once('data', (ackData) => {
-                // Receiver is ready, stream file chunks
+                // Receiver confirmed ready, stream file with 2MB chunk buffer and full backpressure
+                startTime = Date.now();
                 const readStream = fs.createReadStream(filePath, { highWaterMark: CHUNK_SIZE });
 
                 readStream.on('data', (chunk) => {
-                    client.write(chunk);
+                    const canContinue = client.write(chunk);
                     sentBytes += chunk.length;
 
                     const now = Date.now();
-                    const elapsedSec = (now - startTime) / 1000;
-                    const speedMBps = elapsedSec > 0 ? (sentBytes / (1024 * 1024)) / elapsedSec : 0;
-                    const percent = Math.min(100, Math.round((sentBytes / stat.size) * 100));
+                    const isDone = sentBytes >= stat.size;
 
-                    this.emit('file-progress', {
-                        fileId: id,
-                        fileName: fileName,
-                        totalBytes: stat.size,
-                        bytesTransferred: sentBytes,
-                        percent: percent,
-                        speedMBps: speedMBps.toFixed(2),
-                        isComplete: false,
-                        isSender: true,
-                        remoteIp: targetIp
-                    });
+                    // Throttle IPC events to 10/sec to eliminate Electron UI lag
+                    if (now - lastProgressEmitTime >= 100 || isDone) {
+                        lastProgressEmitTime = now;
+                        const elapsedSec = (now - startTime) / 1000;
+                        const speedMBps = elapsedSec > 0 ? (sentBytes / (1024 * 1024)) / elapsedSec : 0;
+                        const percent = Math.min(100, Math.round((sentBytes / stat.size) * 100));
+
+                        this.emit('file-progress', {
+                            fileId: id,
+                            fileName: fileName,
+                            totalBytes: stat.size,
+                            bytesTransferred: sentBytes,
+                            percent: percent,
+                            speedMBps: speedMBps.toFixed(2),
+                            isComplete: isDone,
+                            isSender: true,
+                            remoteIp: targetIp
+                        });
+                    }
+
+                    // Strict backpressure: pause disk reader when network socket buffer is full
+                    if (!canContinue) {
+                        readStream.pause();
+                        client.once('drain', () => {
+                            readStream.resume();
+                        });
+                    }
                 });
 
                 readStream.on('end', () => {

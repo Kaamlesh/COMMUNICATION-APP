@@ -778,14 +778,21 @@ DOM.btnHeaderSendFile.addEventListener('click', handleSendFile);
 // File Progress Tracker
 window.campusAPI.onFileProgress((prog) => {
     DOM.transferBanner.classList.remove('hidden');
+    const speedMB = parseFloat(prog.speedMBps) || 0;
+    const speedGbps = (speedMB * 8 / 1024).toFixed(2);
+    const speedLabel = speedMB >= 100 
+        ? `${speedMB.toFixed(1)} MB/s (${speedGbps} Gbps 🚀 Turbo)` 
+        : `${speedMB.toFixed(1)} MB/s`;
+
     DOM.bannerFileName.textContent = `${prog.fileName} (${prog.percent}%)`;
-    DOM.bannerFileSpeed.textContent = `${prog.speedMBps} MB/s`;
+    DOM.bannerFileSpeed.textContent = speedLabel;
     DOM.bannerProgressFill.style.width = `${prog.percent}%`;
 
     if (prog.isComplete) {
+        DOM.bannerFileSpeed.textContent = `${speedLabel} • Complete!`;
         setTimeout(() => {
             DOM.transferBanner.classList.add('hidden');
-        }, 3000);
+        }, 4000);
     }
 });
 
@@ -1348,7 +1355,7 @@ function formatTime(timestamp) {
 function formatBytes(bytes) {
     if (!bytes) return '0 B';
     const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 }
