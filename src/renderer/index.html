@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CampusConnect - College Intranet Messenger</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="theme-dark">
+
+    <!-- Custom Telegram Titlebar -->
+    <div id="titlebar">
+        <div class="titlebar-drag-region">
+            <div class="titlebar-brand">
+                <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                </svg>
+                <span class="brand-title">CampusConnect</span>
+                <span class="brand-badge" id="titlebar-net-badge">Connected</span>
+            </div>
+            <div class="titlebar-center" id="titlebar-ip-info">
+                Connected to Campus Network
+            </div>
+        </div>
+        <div class="titlebar-controls">
+            <button id="btn-min" class="titlebar-btn" title="Minimize">
+                <svg viewBox="0 0 24 24"><path d="M19 13H5v-2h14v2z"/></svg>
+            </button>
+            <button id="btn-max" class="titlebar-btn" title="Maximize">
+                <svg viewBox="0 0 24 24"><path d="M19 4H5c-1.11 0-2 .9-2 2v12c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H5V8h14v10z"/></svg>
+            </button>
+            <button id="btn-close" class="titlebar-btn close-btn" title="Close">
+                <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div id="app-container">
+
+        <!-- ============================================== -->
+        <!-- VIEW 1: PASSWORDLESS LOGIN VIEW                -->
+        <!-- ============================================== -->
+        <div id="view-login" class="app-view">
+            <div class="login-card">
+                <div class="login-header">
+                    <div class="login-logo-glow">
+                        <svg class="login-logo-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                        </svg>
+                    </div>
+                    <h1 class="login-title">CampusConnect</h1>
+                    <p class="login-subtitle">Campus Peer-to-Peer Communication</p>
+                    <div class="login-campus-features">
+                        <span class="feature-chip"><span class="dot"></span> Instant Campus P2P</span>
+                        <span class="feature-chip"><span class="dot green"></span> No Internet Needed</span>
+                        <span class="feature-chip"><span class="dot blue"></span> 100% Private & Encrypted</span>
+                    </div>
+                </div>
+
+                <form id="login-form" class="login-form">
+                    <div class="form-group">
+                        <label for="input-username">Enter Your Name</label>
+                        <div class="input-wrapper">
+                            <svg class="input-icon" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                            <input type="text" id="input-username" placeholder="e.g. Shiva" required autofocus autocomplete="off">
+                        </div>
+                        <span class="form-tip">No password needed. Your chats are safely encrypted on this laptop.</span>
+                    </div>
+
+                    <div class="network-detect-box">
+                        <div class="net-indicator-dot pulsing"></div>
+                        <div class="net-text">
+                            <span class="net-title">College Network Status</span>
+                            <span class="net-val" id="login-detected-ip">Connected to Campus Wi-Fi</span>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-primary-telegram" id="btn-login-submit">
+                        <span>Start Chatting</span>
+                        <svg class="btn-arrow-icon" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- VIEW 2: TELEGRAM-STYLE DESKTOP MESSENGER       -->
+        <!-- ============================================== -->
+        <div id="view-chat" class="app-view hidden">
+            
+            <!-- LEFT SIDEBAR -->
+            <aside id="sidebar">
+                <!-- Sidebar Header -->
+                <div class="sidebar-header">
+                    <div class="user-menu-btn" id="btn-user-menu" title="Menu & Private Vault">
+                        <div class="avatar-circle" id="my-avatar">S</div>
+                    </div>
+                    <div class="search-box">
+                        <svg class="search-icon" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                        <input type="text" id="search-peers-input" placeholder="Search or enter IP...">
+                    </div>
+                    <button class="btn-icon direct-connect-trigger" id="btn-open-connect-modal" title="Connect by IP / Scan Campus Zones">
+                        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+                    </button>
+                </div>
+
+                <!-- Discovered Peer List -->
+                <div class="peer-list-container" id="peer-list">
+                    <!-- Dynamic peer items injected here automatically -->
+                </div>
+
+                <!-- Sidebar Bottom Status -->
+                <div class="sidebar-footer">
+                    <div class="footer-info">
+                        <span class="footer-dot"></span>
+                        <span id="footer-ip-text">LAN ↔ LAN • LAN ↔ WAN • WAN ↔ WAN</span>
+                    </div>
+                    <span class="footer-discovery-tag">Campus Mesh</span>
+                </div>
+            </aside>
+
+            <!-- RIGHT CHAT AREA -->
+            <main id="chat-panel">
+                
+                <!-- State A: No chat selected -->
+                <div id="no-chat-selected" class="empty-chat-state">
+                    <div class="empty-icon-wrap">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                        </svg>
+                    </div>
+                    <h2>Select a Classmate to Start</h2>
+                    <p>Chat, make voice/video calls, and share files with classmates across campus.</p>
+                    <div class="auto-discover-badge">
+                        <span class="pulse-ring-mini"></span>
+                        <span>Auto-discovering classmates across campus Wi-Fi in the background...</span>
+                    </div>
+                </div>
+
+                <!-- State B: Active chat view -->
+                <div id="active-chat" class="active-chat-state hidden">
+                    <!-- Chat Header -->
+                    <header class="chat-header">
+                        <div class="header-peer-info">
+                            <div class="avatar-circle" id="chat-peer-avatar"></div>
+                            <div class="peer-text-details">
+                                <div class="peer-name-row">
+                                    <span class="peer-name" id="chat-peer-name"></span>
+                                    <span class="chat-link-badge hidden" id="chat-link-badge"></span>
+                                </div>
+                                <div class="peer-status" id="chat-peer-status"></div>
+                            </div>
+                        </div>
+
+                        <div class="header-actions">
+                            <button class="action-btn" id="btn-start-audio-call" title="Start Voice Call">
+                                <svg viewBox="0 0 24 24"><path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 00-1.01.24l-1.57 1.97c-2.83-1.35-5.43-3.9-6.82-6.82l1.97-1.57c.27-.24.35-.61.24-1.01-.36-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/></svg>
+                            </button>
+                            <button class="action-btn" id="btn-start-video-call" title="Start Video Call">
+                                <svg viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
+                            </button>
+                            <button class="action-btn" id="btn-header-send-file" title="Send High-Speed File">
+                                <svg viewBox="0 0 24 24"><path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5a2.5 2.5 0 015 0v10.5c0 .83-.67 1.5-1.5 1.5s-1.5-.67-1.5-1.5V6H9v9.5a3.5 3.5 0 007 0V5a4.5 4.5 0 00-9 0v12.5c0 3.31 2.69 6 6 6s6-2.69 6-6V6h-2.5z"/></svg>
+                            </button>
+                            <div class="encrypted-pill" title="End-to-end encrypted on this laptop">
+                                <svg viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+                                <span>Encrypted</span>
+                            </div>
+                        </div>
+                    </header>
+
+                    <!-- Messages Stream Area -->
+                    <div class="chat-messages-container" id="chat-messages">
+                        <!-- Dynamic message bubbles injected here -->
+                    </div>
+
+                    <!-- Transfer Progress Floating Banner (if active) -->
+                    <div class="transfer-banner hidden" id="transfer-banner">
+                        <div class="banner-icon">🚀</div>
+                        <div class="banner-details">
+                            <div class="banner-row">
+                                <span class="file-name" id="banner-file-name">Project_Presentation.zip</span>
+                                <span class="file-speed" id="banner-file-speed">14.5 MB/s</span>
+                            </div>
+                            <div class="progress-bar-bg">
+                                <div class="progress-bar-fill" id="banner-progress-fill" style="width: 0%;"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Input Bar -->
+                    <footer class="chat-input-bar">
+                        <button class="input-btn" id="btn-attach-file" title="Attach & Send File">
+                            <svg viewBox="0 0 24 24"><path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5a2.5 2.5 0 015 0v10.5c0 .83-.67 1.5-1.5 1.5s-1.5-.67-1.5-1.5V6H9v9.5a3.5 3.5 0 007 0V5a4.5 4.5 0 00-9 0v12.5c0 3.31 2.69 6 6 6s6-2.69 6-6V6h-2.5z"/></svg>
+                        </button>
+                        
+                        <div class="input-area-wrapper">
+                            <textarea id="chat-input-text" placeholder="Write a message..." rows="1"></textarea>
+                        </div>
+
+                        <button class="input-btn" id="btn-voice-record" title="Record Voice Note">
+                            <svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/></svg>
+                        </button>
+
+                        <button class="input-btn send-btn" id="btn-send-message" title="Send (Enter)">
+                            <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                        </button>
+                    </footer>
+                </div>
+            </main>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- MODAL 1: VOICE & VIDEO CALLING OVERLAY        -->
+        <!-- ============================================== -->
+        <div id="modal-calling" class="modal-overlay hidden">
+            <div class="call-dialog">
+                <div class="call-header">
+                    <span class="call-badge">Intranet P2P Call</span>
+                    <span class="call-security">Locked to Campus LAN</span>
+                </div>
+
+                <div class="call-body">
+                    <!-- Audio-only view -->
+                    <div id="call-audio-view" class="call-view">
+                        <div class="call-avatar-wrapper">
+                            <div class="pulse-ring ring-1"></div>
+                            <div class="pulse-ring ring-2"></div>
+                            <div class="call-avatar" id="call-avatar"></div>
+                        </div>
+                        <h2 class="call-peer-name" id="call-peer-name"></h2>
+                        <div class="call-status-text" id="call-status-text">Calling...</div>
+                    </div>
+
+                    <!-- Video view -->
+                    <div id="call-video-view" class="call-view hidden">
+                        <video id="remote-video" autoplay playsinline></video>
+                        <video id="local-video" autoplay playsinline muted></video>
+                    </div>
+                    <!-- Audio-only stream element -->
+                    <audio id="remote-audio" autoplay playsinline></audio>
+                </div>
+
+                <!-- Call Controls -->
+                <div class="call-controls">
+                    <button class="call-btn" id="btn-call-mute-mic" title="Mute Mic">
+                        <svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/></svg>
+                    </button>
+                    <button class="call-btn" id="btn-call-toggle-cam" title="Toggle Camera">
+                        <svg viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
+                    </button>
+                    <button class="call-btn end-call" id="btn-call-end" title="End Call">
+                        <svg viewBox="0 0 24 24"><path d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08a.996.996 0 010-1.41C2.92 9.07 6.94 7 12 7c5.06 0 9.08 2.07 11.71 4.67.39.39.39 1.02 0 1.41l-2.48 2.48c-.18.18-.43.29-.71.29-.27 0-.52-.11-.7-.28-.79-.74-1.69-1.36-2.67-1.85-.33-.16-.56-.5-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z"/></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- MODAL 2: INCOMING CALL PROMPT                  -->
+        <!-- ============================================== -->
+        <div id="modal-incoming-call" class="modal-overlay hidden">
+            <div class="incoming-call-dialog">
+                <div class="call-header">
+                    <span class="call-badge">Intranet Call</span>
+                    <span class="call-security">Encrypted LAN Peer</span>
+                </div>
+                <div class="incoming-call-body">
+                    <div class="call-avatar-wrapper">
+                        <div class="pulse-ring ring-1"></div>
+                        <div class="pulse-ring ring-2"></div>
+                        <div class="call-avatar" id="incoming-call-avatar"></div>
+                    </div>
+                    <h2 class="call-peer-name" id="incoming-call-name">Classmate</h2>
+                    <div class="incoming-call-type" id="incoming-call-type">Incoming Video Call...</div>
+                </div>
+                <div class="incoming-call-actions">
+                    <button class="incoming-call-btn decline" id="btn-incoming-decline" title="Decline Call">
+                        <svg viewBox="0 0 24 24"><path d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08a.996.996 0 010-1.41C2.92 9.07 6.94 7 12 7c5.06 0 9.08 2.07 11.71 4.67.39.39.39 1.02 0 1.41l-2.48 2.48c-.18.18-.43.29-.71.29-.27 0-.52-.11-.7-.28-.79-.74-1.69-1.36-2.67-1.85-.33-.16-.56-.5-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z"/></svg>
+                        <span>Decline</span>
+                    </button>
+                    <button class="incoming-call-btn accept" id="btn-incoming-accept" title="Accept Call">
+                        <svg viewBox="0 0 24 24"><path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 00-1.01.24l-2.2 2.2a15.057 15.057 0 01-6.59-6.59l2.2-2.21a.96.96 0 00.25-1.01A11.36 11.36 0 018.5 3.99c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1 0 9.39 7.61 17 17 17 .55 0 1-.45 1-1v-3.5c0-.55-.45-1-1-1z"/></svg>
+                        <span>Accept</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- MODAL 3: LOCAL ENCRYPTED VAULT TRANSPARENCY    -->
+        <!-- ============================================== -->
+        <div id="modal-vault" class="modal-overlay hidden">
+            <div class="vault-dialog">
+                <div class="modal-header">
+                    <div class="modal-title-wrap">
+                        <h3>Local Encrypted Storage</h3>
+                        <p>100% stored on this laptop • Zero cloud servers</p>
+                    </div>
+                    <button class="btn-close-modal" id="btn-close-vault-modal">&times;</button>
+                </div>
+
+                <div class="modal-content">
+                    <div class="vault-stats-grid">
+                        <div class="stat-card">
+                            <span class="stat-label">Encryption Algorithm</span>
+                            <span class="stat-value">AES-256-GCM</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label">Device Key Derivation</span>
+                            <span class="stat-value">PBKDF2 (100k iter)</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label">Storage Location</span>
+                            <span class="stat-value highlight" id="vault-stat-path">~/.campusconnect/vault.enc</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label">Encrypted Size</span>
+                            <span class="stat-value" id="vault-stat-size">0 KB</span>
+                        </div>
+                    </div>
+
+                    <div class="vault-actions">
+                        <button class="btn-vault-action" id="btn-open-downloads">
+                            <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+                            <span>Open Received Files Folder</span>
+                        </button>
+                        <button class="btn-vault-action danger" id="btn-logout">
+                            <svg viewBox="0 0 24 24"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+                            <span>Logout / Switch User</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- MODAL 4: DIRECT CONNECT & CAMPUS ZONE SCANNER  -->
+        <!-- ============================================== -->
+        <div id="modal-direct-connect" class="modal-overlay hidden">
+            <div class="connect-dialog">
+                <div class="modal-header">
+                    <div class="modal-title-wrap">
+                        <h3>Connect by IP / Campus Zones</h3>
+                        <p>Works across Wi-Fi, Ethernet, Hotspots & Hostels</p>
+                    </div>
+                    <button class="btn-close-modal" id="btn-close-connect-modal">&times;</button>
+                </div>
+                <div class="modal-content">
+                    <!-- My IP Quick Info Card -->
+                    <div class="my-ip-card">
+                        <div class="my-ip-info">
+                            <span class="my-ip-label">Your Active Network IP</span>
+                            <span class="my-ip-value" id="direct-my-ip">Detecting...</span>
+                            <span class="my-ip-type" id="direct-my-type">Mobile Hotspot</span>
+                        </div>
+                        <button class="btn-copy-ip" id="btn-copy-my-ip" title="Copy IP to share with friends">
+                            <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+                            <span>Copy IP</span>
+                        </button>
+                    </div>
+
+                    <!-- Direct IP Input Form -->
+                    <form id="form-direct-connect" class="direct-connect-form">
+                        <div class="connect-inputs-row">
+                            <div class="input-group ip-group">
+                                <label for="input-peer-ip">Friend's IP Address</label>
+                                <input type="text" id="input-peer-ip" placeholder="e.g. 192.168.43.50 or 10.118.65.10" required>
+                            </div>
+                            <div class="input-group port-group">
+                                <label for="input-peer-port">Port</label>
+                                <input type="number" id="input-peer-port" value="8765" placeholder="8765">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn-primary-action" id="btn-submit-direct-connect">
+                            <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                            <span>Connect Instantly</span>
+                        </button>
+                        <div class="connect-feedback-text" id="direct-connect-feedback"></div>
+                    </form>
+
+                    <!-- Campus Zone Scanning Presets -->
+                    <div class="campus-zones-section">
+                        <span class="zone-section-title">Quick Scan Campus Subnet Zones</span>
+                        <div class="zone-chips-grid">
+                            <button class="zone-scan-chip" data-zone="hotspot">
+                                <span class="zone-icon">📱</span>
+                                <div class="zone-details">
+                                    <span class="zone-name">Mobile Hotspot</span>
+                                    <span class="zone-sub">192.168.43.x • 172.20.10.x</span>
+                                </div>
+                            </button>
+                            <button class="zone-scan-chip" data-zone="boys-hostel">
+                                <span class="zone-icon">🏢</span>
+                                <div class="zone-details">
+                                    <span class="zone-name">Boys Hostel</span>
+                                    <span class="zone-sub">Blocks 1-8 (10.118.50-100)</span>
+                                </div>
+                            </button>
+                            <button class="zone-scan-chip" data-zone="girls-hostel">
+                                <span class="zone-icon">🏠</span>
+                                <div class="zone-details">
+                                    <span class="zone-name">Girls Hostel</span>
+                                    <span class="zone-sub">Blocks 1-6 (10.118.101-150)</span>
+                                </div>
+                            </button>
+                            <button class="zone-scan-chip" data-zone="departments">
+                                <span class="zone-icon">🎓</span>
+                                <div class="zone-details">
+                                    <span class="zone-name">Departments</span>
+                                    <span class="zone-sub">CSE / AI / IT / ECE (10.118.220-245)</span>
+                                </div>
+                            </button>
+                            <button class="zone-scan-chip" data-zone="labs">
+                                <span class="zone-icon">💻</span>
+                                <div class="zone-details">
+                                    <span class="zone-name">Central Labs</span>
+                                    <span class="zone-sub">Server Zone (10.118.1-20)</span>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="renderer.js"></script>
+</body>
+</html>

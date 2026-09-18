@@ -1,0 +1,53 @@
+{
+  "name": "campus-connect",
+  "version": "1.0.0",
+  "description": "Cross-Subnet Campus Intranet P2P Communication Desktop Application",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build:core": "call cpp-core\\build_core.bat",
+    "build:exe": "electron-builder --win nsis",
+    "build": "npm run build:core && npm run build:exe"
+  },
+  "keywords": [
+    "intranet",
+    "p2p",
+    "lan",
+    "campus",
+    "messenger",
+    "webrtc",
+    "file-transfer"
+  ],
+  "author": "CampusConnect Team",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^34.5.8",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.campus.connect",
+    "productName": "CampusConnect",
+    "copyright": "Copyright © 2026 CampusConnect",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis",
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "CampusConnect",
+      "artifactName": "CampusConnect-Setup-${version}.${ext}"
+    },
+    "forceCodeSigning": false,
+    "files": [
+      "src/**/*",
+      "cpp-core/bin/*",
+      "assets/**/*"
+    ]
+  }
+}

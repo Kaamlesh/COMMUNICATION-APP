@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Distribution & Build Outputs
+dist/
+build/
+CampusConnect-Setup*.exe
+
+# Local Encrypted Vault & User Logs
+vault.enc
+*.log
+
+# C++ Intermediate Build Outputs
+cpp-core/x64/
+cpp-core/Debug/
+cpp-core/Release/
+*.obj
+*.pdb
+*.ilk
+*.exp
+*.lib
+
+# OS / Editor Files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
