@@ -144,6 +144,62 @@ app.whenReady().then(() => {
         if (mainWindow && !mainWindow.isDestroyed()) {
             mainWindow.webContents.send('file:progress', progress);
         }
+
+        // WhatsApp-style: Automatically persist received file into chat conversation history
+        if (progress.isComplete && !progress.isSender && progress.senderUuid) {
+            try {
+                const data = vault.load();
+                if (!data.conversations) data.conversations = {};
+                const conversation = data.conversations[progress.senderUuid] || [];
+
+                // Deduplicate by fileId
+                if (!conversation.some(m => m.file && m.file.id === progress.fileId)) {
+                    const msg = {
+                        msgId: progress.fileId,
+                        senderUuid: progress.senderUuid,
+                        senderName: progress.senderName || 'Classmate',
+                        senderDept: progress.senderDept || '',
+                        recipientUuid: network.profile.uuid,
+                        time: Date.now(),
+                        isOutgoing: false,
+                        file: {
+                            id: progress.fileId,
+                            name: progress.fileName,
+                            size: progress.totalBytes,
+                            path: progress.savePath
+                        }
+                    };
+                    conversation.push(msg);
+                    data.conversations[progress.senderUuid] = conversation;
+
+                    // Ensure sender is in data.peers
+                    if (!data.peers) data.peers = [];
+                    const pIdx = data.peers.findIndex(p => p.uuid === progress.senderUuid);
+                    const peerInfo = {
+                        uuid: progress.senderUuid,
+                        username: progress.senderName || 'Classmate',
+                        department: progress.senderDept || '',
+                        ip: progress.remoteIp || '',
+                        port: 8765,
+                        connectionType: 'Intranet Peer',
+                        lastSeen: Date.now()
+                    };
+                    if (pIdx >= 0) {
+                        data.peers[pIdx] = { ...data.peers[pIdx], ...peerInfo };
+                    } else {
+                        data.peers.push(peerInfo);
+                    }
+
+                    vault.save(data);
+
+                    if (mainWindow && !mainWindow.isDestroyed()) {
+                        mainWindow.webContents.send('chat:message-received', msg);
+                    }
+                }
+            } catch (e) {
+                console.error('[Vault] Error saving received file:', e);
+            }
+        }
     });
 
     network.on('call-signal', (signal) => {

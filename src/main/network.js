@@ -8,7 +8,7 @@ const EventEmitter = require('events');
 const DEFAULT_TCP_PORT = 8765;
 const DEFAULT_UDP_PORT = 8766;
 const MULTICAST_ADDR = '239.255.43.21';
-const CHUNK_SIZE = 2 * 1024 * 1024; // 2 MB ultra high-throughput chunks for >1 Gbps line rates
+const CHUNK_SIZE = 4 * 1024 * 1024; // 4 MB ultra high-throughput streaming buffer (>1 Gbps line rate)
 
 class NetworkController extends EventEmitter {
     constructor() {
@@ -272,7 +272,7 @@ class NetworkController extends EventEmitter {
     // TCP Server (Messaging, Files, Signaling, PEX)
     // ==========================================
     _startTCPServer() {
-        this.tcpServer = net.createServer((socket) => {
+        this.tcpServer = net.createServer({ highWaterMark: CHUNK_SIZE }, (socket) => {
             socket.setNoDelay(true);
             socket.setKeepAlive(true, 10000);
 
@@ -309,7 +309,11 @@ class NetworkController extends EventEmitter {
                             speedMBps: speedMBps.toFixed(2),
                             isComplete: isDone,
                             isSender: false,
-                            savePath: receivingFile.savePath
+                            savePath: receivingFile.savePath,
+                            senderUuid: receivingFile.senderUuid,
+                            senderName: receivingFile.senderName,
+                            senderDept: receivingFile.senderDept,
+                            remoteIp: remoteIp
                         });
                     }
 
@@ -348,7 +352,11 @@ class NetworkController extends EventEmitter {
                                 buffer = Buffer.alloc(0);
                                 const canCont = receivingFile.writeStream.write(leftover);
                                 receivingFile.receivedBytes += leftover.length;
-                                if (!canCont) {
+                                if (receivingFile.receivedBytes >= receivingFile.totalBytes) {
+                                    receivingFile.writeStream.end();
+                                    receivingFile = null;
+                                    socket.end();
+                                } else if (!canCont) {
                                     socket.pause();
                                     receivingFile.writeStream.once('drain', () => {
                                         socket.resume();
@@ -366,11 +374,23 @@ class NetworkController extends EventEmitter {
                 if (this.activeSockets.get(remoteIp) === socket) {
                     this.activeSockets.delete(remoteIp);
                 }
+                if (receivingFile && receivingFile.writeStream) {
+                    try {
+                        receivingFile.writeStream.end();
+                    } catch (e) {}
+                    receivingFile = null;
+                }
             });
 
             socket.on('error', (err) => {
                 if (this.activeSockets.get(remoteIp) === socket) {
                     this.activeSockets.delete(remoteIp);
+                }
+                if (receivingFile && receivingFile.writeStream) {
+                    try {
+                        receivingFile.writeStream.destroy();
+                    } catch (e) {}
+                    receivingFile = null;
                 }
             });
         });
@@ -479,21 +499,35 @@ class NetworkController extends EventEmitter {
             socket.write(JSON.stringify({ status: 'delivered' }) + '\n');
         }
         else if (type === 'file_header') {
-            const { fileId, fileName, fileSize } = packet;
+            const { fileId, fileName, fileSize, senderUuid, senderName, senderDept } = packet;
             const safeName = path.basename(fileName);
-            const savePath = path.join(this.downloadsDir, safeName);
-            // 2MB highWaterMark for direct ultra-fast disk writing
+            let savePath = path.join(this.downloadsDir, safeName);
+            
+            // Prevent file collisions if file with same name exists
+            if (fs.existsSync(savePath)) {
+                const parsed = path.parse(safeName);
+                let counter = 1;
+                while (fs.existsSync(savePath)) {
+                    savePath = path.join(this.downloadsDir, `${parsed.name} (${counter})${parsed.ext}`);
+                    counter++;
+                }
+            }
+
+            // High-throughput 4MB streaming buffer
             const writeStream = fs.createWriteStream(savePath, { highWaterMark: CHUNK_SIZE });
 
             setFileHandler({
                 fileId,
-                fileName: safeName,
+                fileName: path.basename(savePath),
                 totalBytes: fileSize,
                 receivedBytes: 0,
                 startTime: Date.now(),
                 lastProgressEmitTime: 0,
                 savePath,
-                writeStream
+                writeStream,
+                senderUuid,
+                senderName,
+                senderDept
             });
 
             socket.write(JSON.stringify({ status: 'ready' }) + '\n');
@@ -928,7 +962,7 @@ class NetworkController extends EventEmitter {
             const fileName = path.basename(filePath);
             const id = fileId || crypto.randomUUID();
 
-            const client = new net.Socket();
+            const client = new net.Socket({ readableHighWaterMark: CHUNK_SIZE, writableHighWaterMark: CHUNK_SIZE });
             // Turbo socket configuration for >1 Gbps line rates
             client.setNoDelay(true);
             client.setKeepAlive(true, 10000);
@@ -936,6 +970,7 @@ class NetworkController extends EventEmitter {
             let sentBytes = 0;
             let startTime = 0;
             let lastProgressEmitTime = 0;
+            let readStream = null;
 
             client.connect(targetPort, targetIp, () => {
                 // Send file header with exact 64-bit byte size (supports >5GB, 10GB, 50GB+)
@@ -943,15 +978,18 @@ class NetworkController extends EventEmitter {
                     type: 'file_header',
                     fileId: id,
                     fileName: fileName,
-                    fileSize: stat.size
+                    fileSize: stat.size,
+                    senderUuid: this.profile.uuid,
+                    senderName: this.profile.username,
+                    senderDept: this.profile.department
                 }) + '\n';
                 client.write(header);
             });
 
             client.once('data', (ackData) => {
-                // Receiver confirmed ready, stream file with 2MB chunk buffer and full backpressure
+                // Receiver confirmed ready, stream file with 4MB chunk buffer and full backpressure
                 startTime = Date.now();
-                const readStream = fs.createReadStream(filePath, { highWaterMark: CHUNK_SIZE });
+                readStream = fs.createReadStream(filePath, { highWaterMark: CHUNK_SIZE });
 
                 readStream.on('data', (chunk) => {
                     const canContinue = client.write(chunk);
@@ -984,7 +1022,7 @@ class NetworkController extends EventEmitter {
                     if (!canContinue) {
                         readStream.pause();
                         client.once('drain', () => {
-                            readStream.resume();
+                            if (readStream) readStream.resume();
                         });
                     }
                 });
@@ -1014,6 +1052,9 @@ class NetworkController extends EventEmitter {
             });
 
             client.on('error', (err) => {
+                if (readStream) {
+                    try { readStream.destroy(); } catch (e) {}
+                }
                 client.destroy();
                 reject(err);
             });

@@ -779,12 +779,14 @@ DOM.btnHeaderSendFile.addEventListener('click', handleSendFile);
 window.campusAPI.onFileProgress((prog) => {
     DOM.transferBanner.classList.remove('hidden');
     const speedMB = parseFloat(prog.speedMBps) || 0;
-    const speedGbps = (speedMB * 8 / 1024).toFixed(2);
-    const speedLabel = speedMB >= 100 
-        ? `${speedMB.toFixed(1)} MB/s (${speedGbps} Gbps 🚀 Turbo)` 
-        : `${speedMB.toFixed(1)} MB/s`;
+    const speedGbps = (speedMB * 8 / 1000).toFixed(2);
+    const speedLabel = speedMB >= 125 
+        ? `${speedMB.toFixed(1)} MB/s (${speedGbps} Gbps 🚀 Ultra Turbo)` 
+        : speedMB >= 50
+            ? `${speedMB.toFixed(1)} MB/s (${speedGbps} Gbps 🚀 High-Speed)`
+            : `${speedMB.toFixed(1)} MB/s`;
 
-    DOM.bannerFileName.textContent = `${prog.fileName} (${prog.percent}%)`;
+    DOM.bannerFileName.textContent = `${prog.fileName} (${formatBytes(prog.bytesTransferred)} / ${formatBytes(prog.totalBytes)} - ${prog.percent}%)`;
     DOM.bannerFileSpeed.textContent = speedLabel;
     DOM.bannerProgressFill.style.width = `${prog.percent}%`;
 
