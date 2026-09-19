@@ -45,6 +45,7 @@ class NetworkController extends EventEmitter {
         this.running = false;
         this.localSweepInterval = null;
         this.autoSweepInterval = null;
+        this.interfaceMonitorInterval = null;
         this.activeSockets = new Map(); // remoteIp -> net.Socket for bi-directional NAT traversal
     }
 
@@ -217,12 +218,14 @@ class NetworkController extends EventEmitter {
         this._startTCPServer();
         this._startUDPDiscovery();
         this._startAutoCampusDiscovery();
+        this._startInterfaceMonitor();
     }
 
     stop() {
         this.running = false;
         if (this.autoSweepInterval) clearInterval(this.autoSweepInterval);
         if (this.beaconInterval) clearInterval(this.beaconInterval);
+        if (this.interfaceMonitorInterval) clearInterval(this.interfaceMonitorInterval);
         if (this.tcpServer) {
             this.tcpServer.close();
             this.tcpServer = null;
@@ -231,6 +234,33 @@ class NetworkController extends EventEmitter {
             this.udpSocket.close();
             this.udpSocket = null;
         }
+    }
+
+    _startInterfaceMonitor() {
+        this.interfaceMonitorInterval = setInterval(() => {
+            if (!this.running) return;
+            const prevIp = this.localIp;
+            const prevType = this.networkType;
+
+            const newIp = this._detectNetworkInterfaces();
+            const newSubnet = this._getSubnetPrefix(newIp);
+
+            if (newIp !== prevIp || this.networkType !== prevType) {
+                console.log(`[Network Monitor] Interface changed: ${prevIp} (${prevType}) -> ${newIp} (${this.networkType})`);
+                this.localIp = newIp;
+                this.localSubnet = newSubnet;
+
+                this.emit('network-ready', { 
+                    ip: this.localIp, 
+                    port: this.tcpPort, 
+                    subnet: this.localSubnet, 
+                    networkType: this.networkType 
+                });
+
+                // Immediately recalculate peer reachability when switching interfaces
+                this._checkPeerHealth();
+            }
+        }, 3000);
     }
 
     loadSavedPeers(peersList) {
@@ -425,14 +455,18 @@ class NetworkController extends EventEmitter {
                 });
             }
 
-            // Also merge any transitive peers passed in Gossip
+            // Also merge any transitive peers passed in Gossip (register as offline until directly verified)
             if (Array.isArray(knownPeers)) {
                 for (const p of knownPeers) {
                     if (p.uuid && p.uuid !== this.profile.uuid) {
                         this._registerPeer({
                             ...p,
+                            isOnline: false,
                             viaGossip: true
                         });
+                        if (p.ip && this.localIp !== '127.0.0.1') {
+                            this.probePeer(p.ip, p.port || DEFAULT_TCP_PORT, 400);
+                        }
                     }
                 }
             }
@@ -477,8 +511,12 @@ class NetworkController extends EventEmitter {
                     if (p.uuid && p.uuid !== this.profile.uuid) {
                         this._registerPeer({
                             ...p,
+                            isOnline: false,
                             viaGossip: true
                         });
+                        if (p.ip && this.localIp !== '127.0.0.1') {
+                            this.probePeer(p.ip, p.port || DEFAULT_TCP_PORT, 400);
+                        }
                     }
                 }
             }
@@ -622,8 +660,17 @@ class NetworkController extends EventEmitter {
     _checkPeerHealth() {
         const now = Date.now();
         let changed = false;
+
+        // If local interface is offline or localhost, all remote peers are offline
+        const isOffline = !this.localIp || this.localIp === '127.0.0.1' || (this.networkType && this.networkType.includes('Offline'));
+
         for (const [uuid, peer] of this.peers.entries()) {
-            if (peer.isOnline && now - peer.lastSeen > 25000) {
+            if (isOffline) {
+                if (peer.isOnline) {
+                    peer.isOnline = false;
+                    changed = true;
+                }
+            } else if (peer.isOnline && now - (peer.lastSeen || 0) > 9000) {
                 peer.isOnline = false;
                 changed = true;
             }
@@ -637,6 +684,9 @@ class NetworkController extends EventEmitter {
         if (!peer || !peer.uuid || peer.uuid === this.profile.uuid) return;
         const existing = this.peers.get(peer.uuid);
 
+        // If local interface is offline, cannot register anyone as online
+        const isLocalOffline = !this.localIp || this.localIp === '127.0.0.1' || (this.networkType && this.networkType.includes('Offline'));
+
         const connType = peer.connectionType || this.classifyConnection(
             this.localIp,
             peer.ip,
@@ -644,12 +694,23 @@ class NetworkController extends EventEmitter {
             peer.viaGossip || false
         );
 
+        let isOnline = false;
+        if (!isLocalOffline) {
+            if (peer.isOnline !== undefined) {
+                isOnline = Boolean(peer.isOnline);
+            } else if (peer.viaGossip) {
+                isOnline = existing?.isOnline || false;
+            } else {
+                isOnline = true;
+            }
+        }
+
         this.peers.set(peer.uuid, {
             ...existing,
             ...peer,
             connectionType: connType,
-            lastSeen: Date.now(),
-            isOnline: true
+            lastSeen: isOnline ? Date.now() : (peer.lastSeen || existing?.lastSeen || 0),
+            isOnline: isOnline
         });
         this.emit('peers-updated', this.getPeerList());
     }
@@ -720,8 +781,12 @@ class NetworkController extends EventEmitter {
                                     if (p.uuid && p.uuid !== this.profile.uuid) {
                                         this._registerPeer({
                                             ...p,
+                                            isOnline: false,
                                             viaGossip: true
                                         });
+                                        if (p.ip && this.localIp !== '127.0.0.1') {
+                                            this.probePeer(p.ip, p.port || DEFAULT_TCP_PORT, 400);
+                                        }
                                     }
                                 }
                             }

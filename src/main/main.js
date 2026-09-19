@@ -75,6 +75,17 @@ app.whenReady().then(() => {
     network = new NetworkController();
 
     // Wire network events to frontend
+    network.on('network-ready', (netStatus) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('network:status-changed', {
+                ip: network.localIp,
+                port: network.tcpPort,
+                subnet: network.localSubnet,
+                networkType: network.networkType
+            });
+        }
+    });
+
     network.on('peers-updated', (peers) => {
         if (mainWindow && !mainWindow.isDestroyed()) {
             mainWindow.webContents.send('peers:updated', peers);
@@ -330,6 +341,32 @@ function setupIPC() {
         const ok = await network.connectPeer(cleanIp, targetPort);
         const peer = Array.from(network.peers.values()).find(p => p.ip === cleanIp);
         return { success: ok, peer };
+    });
+
+    ipcMain.handle('network:check-peer-online', async (event, { ip, port, uuid }) => {
+        if (!ip || ip === '127.0.0.1' || network.localIp === '127.0.0.1' || (network.networkType && network.networkType.includes('Offline'))) {
+            if (uuid && network.peers.has(uuid)) {
+                const p = network.peers.get(uuid);
+                if (p.isOnline) {
+                    p.isOnline = false;
+                    network.peers.set(uuid, p);
+                    network.emit('peers-updated', network.getPeerList());
+                }
+            }
+            return { isOnline: false };
+        }
+
+        const isOnline = await network.probePeer(ip, port || 8765, 450);
+        if (uuid && network.peers.has(uuid)) {
+            const p = network.peers.get(uuid);
+            if (p.isOnline !== isOnline) {
+                p.isOnline = isOnline;
+                if (isOnline) p.lastSeen = Date.now();
+                network.peers.set(uuid, p);
+                network.emit('peers-updated', network.getPeerList());
+            }
+        }
+        return { isOnline };
     });
 
     ipcMain.handle('network:scan-category', async (event, { category }) => {

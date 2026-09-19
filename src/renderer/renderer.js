@@ -346,6 +346,22 @@ DOM.loginForm.addEventListener('submit', async (e) => {
 // ==========================================
 // Peer Discovery & List Rendering
 // ==========================================
+window.campusAPI.onNetworkStatusChanged((netStatus) => {
+    state.networkStatus = netStatus;
+    updateNetworkUI(netStatus);
+    if (state.activePeer && state.activePeer.ip) {
+        window.campusAPI.checkPeerOnline(state.activePeer.ip, state.activePeer.port, state.activePeer.uuid).then((res) => {
+            if (state.activePeer) {
+                state.activePeer.isOnline = res.isOnline;
+                const matchInState = state.peers.find(p => p.uuid === state.activePeer.uuid);
+                if (matchInState) matchInState.isOnline = res.isOnline;
+                updateActiveChatHeader(state.activePeer);
+                renderPeerList();
+            }
+        }).catch(() => {});
+    }
+});
+
 window.campusAPI.onPeersUpdated((peers) => {
     const peerMap = new Map();
     // Keep all existing peers in state (including offline chat contacts)
@@ -359,7 +375,7 @@ window.campusAPI.onPeersUpdated((peers) => {
             peerMap.set(p.uuid, {
                 ...prev,
                 ...p,
-                isOnline: p.isOnline !== undefined ? p.isOnline : true
+                isOnline: Boolean(p.isOnline)
             });
         }
     }
@@ -509,7 +525,7 @@ function renderPeerList() {
     });
 }
 
-function selectPeer(peer) {
+async function selectPeer(peer) {
     state.activePeer = peer;
     renderPeerList();
 
@@ -518,6 +534,20 @@ function selectPeer(peer) {
 
     updateActiveChatHeader(peer);
     renderMessages(peer);
+
+    // Live reachability check: immediately verify if classmate is genuinely reachable
+    if (peer.ip) {
+        try {
+            const check = await window.campusAPI.checkPeerOnline(peer.ip, peer.port, peer.uuid);
+            if (state.activePeer && state.activePeer.uuid === peer.uuid) {
+                state.activePeer.isOnline = check.isOnline;
+                const matchInState = state.peers.find(p => p.uuid === peer.uuid);
+                if (matchInState) matchInState.isOnline = check.isOnline;
+                updateActiveChatHeader(state.activePeer);
+                renderPeerList();
+            }
+        } catch (e) {}
+    }
 }
 
 function updateActiveChatHeader(peer) {
@@ -566,8 +596,20 @@ function renderMessages(peer) {
 }
 
 function appendMessageBubble(msg) {
+    const myUuid = state.profile?.uuid;
+    const myName = (state.profile?.username || '').toLowerCase();
+
+    // Accurately determine if the message was sent by me or received from a peer
+    const isMe = (msg.senderUuid && myUuid && msg.senderUuid === myUuid) ||
+                 (msg.senderName && myName && msg.senderName.toLowerCase() === myName) ||
+                 (msg.isOutgoing === true && (!msg.recipientUuid || (myUuid && msg.recipientUuid !== myUuid)));
+
+    const isOutgoing = Boolean(isMe);
+    const senderDisplayName = isOutgoing ? 'You' : (msg.senderName || state.activePeer?.username || 'Classmate');
+    const senderInitial = (senderDisplayName || 'P').charAt(0).toUpperCase();
+
     const row = document.createElement('div');
-    row.className = `msg-row ${msg.isOutgoing ? 'outgoing' : 'incoming'}`;
+    row.className = `msg-row ${isOutgoing ? 'outgoing' : 'incoming'}`;
 
     const timeStr = formatTime(msg.time);
     let contentHtml = '';
@@ -580,7 +622,7 @@ function appendMessageBubble(msg) {
                     <div class="file-name">${escapeHtml(msg.file.name)}</div>
                     <div class="file-size">${formatBytes(msg.file.size)}</div>
                 </div>
-                ${!msg.isOutgoing ? `
+                ${!isOutgoing ? `
                     <button class="btn-download-file" title="Open File" data-path="${msg.file.path || ''}">
                         <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
                     </button>
@@ -607,14 +649,28 @@ function appendMessageBubble(msg) {
         contentHtml = `<div class="msg-text">${escapeHtml(msg.text)}</div>`;
     }
 
-    const checkmarks = msg.isOutgoing ? `
+    const checkmarks = isOutgoing ? `
         <span class="msg-ticks" title="Delivered">
             <svg viewBox="0 0 24 24"><path d="M18 7l-1.41-1.41-6.34 6.34 1.41 1.41L18 7zm4.24-1.41L11.66 16.17 7.41 11.93l-1.41 1.41 5.66 5.66 12-12-1.42-1.41zM.41 13.41L6.07 19.07l1.41-1.41L1.83 12 .41 13.41z"/></svg>
         </span>
     ` : '';
 
+    const avatarHtml = !isOutgoing ? `
+        <div class="msg-peer-avatar" style="background: ${getAvatarColor(senderDisplayName)}" title="${escapeHtml(senderDisplayName)}">
+            ${senderInitial}
+        </div>
+    ` : '';
+
+    const senderHeaderHtml = `
+        <div class="msg-sender-name ${isOutgoing ? 'outgoing' : 'incoming'}">
+            ${escapeHtml(senderDisplayName)}
+        </div>
+    `;
+
     row.innerHTML = `
+        ${avatarHtml}
         <div class="msg-bubble">
+            ${senderHeaderHtml}
             ${contentHtml}
             <div class="msg-meta">
                 <span>${timeStr}</span>

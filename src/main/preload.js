@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('campusAPI', {
     // Network & Peer Discovery
     getNetworkStatus: () => ipcRenderer.invoke('network:get-status'),
     connectPeer: (ip, port) => ipcRenderer.invoke('network:connect-peer', { ip, port }),
+    checkPeerOnline: (ip, port, uuid) => ipcRenderer.invoke('network:check-peer-online', { ip, port, uuid }),
     probeSubnet: (subnetPrefix) => ipcRenderer.invoke('network:probe-subnet', { subnetPrefix }),
     scanCategory: (category) => ipcRenderer.invoke('network:scan-category', { category }),
 
@@ -32,6 +33,11 @@ contextBridge.exposeInMainWorld('campusAPI', {
     closeWindow: () => ipcRenderer.send('window:close'),
 
     // Event listeners from backend
+    onNetworkStatusChanged: (callback) => {
+        const sub = (event, data) => callback(data);
+        ipcRenderer.on('network:status-changed', sub);
+        return () => ipcRenderer.removeListener('network:status-changed', sub);
+    },
     onPeersUpdated: (callback) => {
         const sub = (event, data) => callback(data);
         ipcRenderer.on('peers:updated', sub);
