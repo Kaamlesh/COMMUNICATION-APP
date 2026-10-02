@@ -152,7 +152,19 @@ const DOM = {
     modalPeerConnType: document.getElementById('modal-peer-conn-type'),
     btnPeerModalChat: document.getElementById('btn-peer-modal-chat'),
     btnPeerModalCall: document.getElementById('btn-peer-modal-call'),
-    btnPeerModalVideo: document.getElementById('btn-peer-modal-video')
+    btnPeerModalVideo: document.getElementById('btn-peer-modal-video'),
+
+    // Birthday Banner
+    birthdayTopBanner: document.getElementById('birthday-top-banner'),
+    birthdayBannerText: document.getElementById('birthday-banner-text'),
+    birthdayBannerActions: document.getElementById('birthday-banner-actions'),
+    btnDismissBirthdayBanner: document.getElementById('btn-dismiss-birthday-banner'),
+
+    // Profile View & Close Action Controls
+    btnHeaderViewProfile: document.getElementById('btn-header-view-profile'),
+    btnCancelProfile: document.getElementById('btn-cancel-profile'),
+    btnCloseVaultBottom: document.getElementById('btn-close-vault-bottom'),
+    btnClosePeerProfileBottom: document.getElementById('btn-close-peer-profile-bottom')
 };
 
 function calculateAge(birthdayStr) {
@@ -170,6 +182,29 @@ function calculateAge(birthdayStr) {
     } catch (e) {
         return null;
     }
+}
+
+function isBirthdayToday(birthdayStr) {
+    if (!birthdayStr) return false;
+    try {
+        // Robust parsing of YYYY-MM-DD or ISO string without timezone shifts
+        const parts = birthdayStr.split('-');
+        if (parts.length < 3) return false;
+        const bMonth = parseInt(parts[1], 10) - 1; // 0-indexed month
+        const bDay = parseInt(parts[2], 10);
+        const today = new Date();
+        return today.getMonth() === bMonth && today.getDate() === bDay;
+    } catch (e) {
+        return false;
+    }
+}
+
+function getTodayDateKey() {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
 }
 
 function formatBirthday(birthdayStr) {
@@ -369,6 +404,86 @@ function showLoginView() {
     DOM.viewChat.classList.add('hidden');
 }
 
+// ==========================================
+// Telegram-Style Birthday Notification Banner
+// ==========================================
+function checkTodayBirthdays() {
+    if (!DOM.birthdayTopBanner || !state.peers) return;
+    const todayKey = getTodayDateKey();
+    const dismissKey = 'cc_bday_dismissed_' + todayKey;
+
+    // Automatically purge old dismissal entries from previous days
+    try {
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+            const k = localStorage.key(i);
+            if (k && k.startsWith('cc_bday_dismissed_') && k !== dismissKey) {
+                localStorage.removeItem(k);
+            }
+        }
+    } catch (e) {}
+
+    // If user already dismissed the banner on this specific calendar day, do not show
+    if (localStorage.getItem(dismissKey) === 'true') {
+        DOM.birthdayTopBanner.classList.add('hidden');
+        return;
+    }
+
+    // Filter peers whose birthday is strictly TODAY.
+    // If someone had a birthday yesterday and the user didn't open the app yesterday,
+    // isBirthdayToday will evaluate to false today and will NOT show!
+    const bdayPeers = state.peers.filter(p => isBirthdayToday(p.birthday));
+
+    if (bdayPeers.length === 0) {
+        DOM.birthdayTopBanner.classList.add('hidden');
+        return;
+    }
+
+    // Compose banner headline & details
+    if (bdayPeers.length === 1) {
+        const p = bdayPeers[0];
+        const age = calculateAge(p.birthday);
+        const ageStr = age !== null ? `${age}th ` : '';
+        DOM.birthdayBannerText.textContent = `Today is ${p.username}'s ${ageStr}Birthday! 🎂 Send them your heartfelt wishes!`;
+    } else {
+        const names = bdayPeers.map(p => p.username).join(', ');
+        DOM.birthdayBannerText.textContent = `Today is ${names}'s Birthday! 🎂 Wish your classmates a wonderful day!`;
+    }
+
+    // Build quick celebratory greeting buttons
+    if (DOM.birthdayBannerActions) {
+        DOM.birthdayBannerActions.innerHTML = '';
+        bdayPeers.forEach(p => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn-birthday-wish';
+            btn.textContent = `🎂 Wish ${p.username}`;
+            btn.title = `Send birthday wishes to ${p.username}`;
+            btn.addEventListener('click', () => {
+                selectPeer(p);
+                if (DOM.chatInputText) {
+                    DOM.chatInputText.value = `🎉 Happy Birthday, ${p.username}! Wishing you a wonderful birthday and a fantastic year ahead! 🎂🎈✨`;
+                    DOM.chatInputText.style.height = 'auto';
+                    DOM.chatInputText.style.height = Math.min(DOM.chatInputText.scrollHeight, 120) + 'px';
+                    DOM.chatInputText.focus();
+                }
+            });
+            DOM.birthdayBannerActions.appendChild(btn);
+        });
+    }
+
+    DOM.birthdayTopBanner.classList.remove('hidden');
+}
+
+if (DOM.btnDismissBirthdayBanner) {
+    DOM.btnDismissBirthdayBanner.addEventListener('click', () => {
+        const todayKey = getTodayDateKey();
+        localStorage.setItem('cc_bday_dismissed_' + todayKey, 'true');
+        if (DOM.birthdayTopBanner) {
+            DOM.birthdayTopBanner.classList.add('hidden');
+        }
+    });
+}
+
 function showChatView() {
     DOM.viewLogin.classList.add('hidden');
     DOM.viewChat.classList.remove('hidden');
@@ -385,6 +500,12 @@ function showChatView() {
     }
 
     renderPeerList();
+    checkTodayBirthdays();
+
+    // Auto-refresh daily birthday state every 60s (handles midnight date rollover while app is running)
+    if (!window._bdayRefreshTimer) {
+        window._bdayRefreshTimer = setInterval(checkTodayBirthdays, 60000);
+    }
 }
 
 // ==========================================
@@ -470,6 +591,7 @@ window.campusAPI.onPeersUpdated((peers) => {
     }
     state.peers = Array.from(peerMap.values());
     renderPeerList();
+    checkTodayBirthdays();
     if (state.activePeer) {
         const updated = state.peers.find(p => p.uuid === state.activePeer.uuid);
         if (updated) {
@@ -614,6 +736,16 @@ function renderPeerList() {
                 </div>
             </div>
         `;
+
+        const avatarWrap = item.querySelector('.peer-avatar-wrapper');
+        if (avatarWrap) {
+            avatarWrap.style.cursor = 'pointer';
+            avatarWrap.title = `View ${escapeHtml(peer.username)}'s Profile (Read Only)`;
+            avatarWrap.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openPeerProfileModal(peer);
+            });
+        }
 
         item.addEventListener('click', () => selectPeer(peer));
         DOM.peerList.appendChild(item);
@@ -811,6 +943,41 @@ function appendMessageBubble(msg) {
         btnVoice.addEventListener('click', () => {
             const base64Audio = btnVoice.getAttribute('data-audio');
             playAudio(base64Audio);
+        });
+    }
+
+    // Allow clicking on incoming peer message avatar or sender name to view their profile (read-only)
+    const msgAvatar = row.querySelector('.msg-peer-avatar');
+    if (msgAvatar) {
+        msgAvatar.style.cursor = 'pointer';
+        msgAvatar.title = `View ${escapeHtml(senderDisplayName)}'s Profile (Read Only)`;
+        msgAvatar.addEventListener('click', () => {
+            const found = state.peers.find(p => 
+                (msg.senderUuid && p.uuid === msg.senderUuid) ||
+                (p.username && p.username.toLowerCase() === (msg.senderName || '').toLowerCase())
+            );
+            if (found) {
+                openPeerProfileModal(found);
+            } else if (state.activePeer) {
+                openPeerProfileModal(state.activePeer);
+            }
+        });
+    }
+
+    const senderHeader = row.querySelector('.msg-sender-name.incoming');
+    if (senderHeader) {
+        senderHeader.style.cursor = 'pointer';
+        senderHeader.title = `View ${escapeHtml(senderDisplayName)}'s Profile (Read Only)`;
+        senderHeader.addEventListener('click', () => {
+            const found = state.peers.find(p => 
+                (msg.senderUuid && p.uuid === msg.senderUuid) ||
+                (p.username && p.username.toLowerCase() === (msg.senderName || '').toLowerCase())
+            );
+            if (found) {
+                openPeerProfileModal(found);
+            } else if (state.activePeer) {
+                openPeerProfileModal(state.activePeer);
+            }
         });
     }
 
@@ -1533,8 +1700,22 @@ if (DOM.chatPeerInfoTrigger) {
     });
 }
 
+if (DOM.btnHeaderViewProfile) {
+    DOM.btnHeaderViewProfile.addEventListener('click', () => {
+        if (state.activePeer) {
+            openPeerProfileModal(state.activePeer);
+        }
+    });
+}
+
 if (DOM.btnClosePeerProfileModal) {
     DOM.btnClosePeerProfileModal.addEventListener('click', () => {
+        DOM.modalPeerProfile.classList.add('hidden');
+    });
+}
+
+if (DOM.btnClosePeerProfileBottom) {
+    DOM.btnClosePeerProfileBottom.addEventListener('click', () => {
         DOM.modalPeerProfile.classList.add('hidden');
     });
 }
@@ -1662,7 +1843,43 @@ if (DOM.formEditProfile) {
     });
 }
 
-DOM.btnCloseVaultModal.addEventListener('click', () => DOM.modalVault.classList.add('hidden'));
+if (DOM.btnCloseVaultModal) {
+    DOM.btnCloseVaultModal.addEventListener('click', () => DOM.modalVault.classList.add('hidden'));
+}
+
+if (DOM.btnCancelProfile) {
+    DOM.btnCancelProfile.addEventListener('click', () => DOM.modalVault.classList.add('hidden'));
+}
+
+if (DOM.btnCloseVaultBottom) {
+    DOM.btnCloseVaultBottom.addEventListener('click', () => DOM.modalVault.classList.add('hidden'));
+}
+
+// Backdrop clicks close active modals
+[DOM.modalVault, DOM.modalPeerProfile, DOM.modalDirectConnect].forEach(modal => {
+    if (modal) {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.classList.add('hidden');
+            }
+        });
+    }
+});
+
+// Global Escape key closes any open modal window
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        if (DOM.modalVault && !DOM.modalVault.classList.contains('hidden')) {
+            DOM.modalVault.classList.add('hidden');
+        }
+        if (DOM.modalPeerProfile && !DOM.modalPeerProfile.classList.contains('hidden')) {
+            DOM.modalPeerProfile.classList.add('hidden');
+        }
+        if (DOM.modalDirectConnect && !DOM.modalDirectConnect.classList.contains('hidden')) {
+            DOM.modalDirectConnect.classList.add('hidden');
+        }
+    }
+});
 
 DOM.btnOpenDownloads.addEventListener('click', () => {
     window.campusAPI.openDownloadsFolder();
