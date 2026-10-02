@@ -34,6 +34,9 @@ namespace CampusNet {
         std::string uuid;
         std::string username;
         std::string department;
+        std::string bio;
+        std::string birthday;
+        int age = 0;
         std::string ip;
         int port = DEFAULT_TCP_PORT;
         uint64_t lastSeenMs = 0;
@@ -90,11 +93,11 @@ namespace CampusNet {
         Engine();
         ~Engine();
 
-        bool Initialize(const std::string& username, const std::string& department, int tcpPort = DEFAULT_TCP_PORT);
+        bool Initialize(const std::string& username, const std::string& department, int tcpPort = DEFAULT_TCP_PORT, const std::string& bio = "", const std::string& birthday = "", int age = 0);
         void Shutdown();
 
         // User Identity
-        void UpdateProfile(const std::string& username, const std::string& department);
+        void UpdateProfile(const std::string& username, const std::string& department, const std::string& bio = "", const std::string& birthday = "", int age = 0);
         PeerInfo GetLocalPeerInfo() const;
 
         // Peer Discovery & Gossip across subnets

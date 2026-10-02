@@ -4,7 +4,8 @@ contextBridge.exposeInMainWorld('campusAPI', {
     // Vault & User session
     loadVault: () => ipcRenderer.invoke('vault:load'),
     saveVault: (data) => ipcRenderer.invoke('vault:save', data),
-    login: (username, department) => ipcRenderer.invoke('vault:login', { username, department }),
+    login: (username, department = '', bio = '', birthday = '') => ipcRenderer.invoke('vault:login', { username, department, bio, birthday }),
+    updateProfile: ({ username, department, bio, birthday }) => ipcRenderer.invoke('vault:update-profile', { username, department, bio, birthday }),
     logout: () => ipcRenderer.invoke('vault:logout'),
     getVaultStats: () => ipcRenderer.invoke('vault:get-stats'),
 

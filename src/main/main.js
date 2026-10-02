@@ -18,6 +18,23 @@ let vault = null;
 let network = null;
 let cppProcess = null;
 
+function calculateAge(birthdayStr) {
+    if (!birthdayStr) return null;
+    try {
+        const birthDate = new Date(birthdayStr);
+        if (isNaN(birthDate.getTime())) return null;
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+            age--;
+        }
+        return age >= 0 ? age : null;
+    } catch (e) {
+        return null;
+    }
+}
+
 function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1200,
@@ -101,11 +118,19 @@ app.whenReady().then(() => {
             for (const p of peers) {
                 if (p && p.uuid) {
                     const prev = peerMap.get(p.uuid) || {};
+                    const bday = p.birthday !== undefined ? p.birthday : (prev.birthday || '');
+                    const peerAge = (p.age !== undefined && p.age !== null)
+                        ? p.age
+                        : (prev.age !== undefined && prev.age !== null ? prev.age : calculateAge(bday));
+
                     peerMap.set(p.uuid, {
                         ...prev,
                         uuid: p.uuid,
                         username: p.username || prev.username || 'Classmate',
                         department: p.department || prev.department || '',
+                        bio: p.bio !== undefined ? p.bio : (prev.bio || ''),
+                        birthday: bday,
+                        age: peerAge,
                         ip: p.ip || prev.ip || '',
                         port: p.port || prev.port || 8765,
                         connectionType: p.connectionType || prev.connectionType || 'Intranet Peer',
@@ -130,10 +155,18 @@ app.whenReady().then(() => {
             // Ensure sender peer is saved in data.peers so receiver always has this chat in their list
             if (!data.peers) data.peers = [];
             const existingPeerIdx = data.peers.findIndex(p => p.uuid === msg.senderUuid);
+            const bday = msg.senderBirthday !== undefined ? msg.senderBirthday : (existingPeerIdx >= 0 ? data.peers[existingPeerIdx].birthday || '' : '');
+            const peerAge = (msg.senderAge !== undefined && msg.senderAge !== null)
+                ? msg.senderAge
+                : (existingPeerIdx >= 0 && data.peers[existingPeerIdx].age !== undefined ? data.peers[existingPeerIdx].age : calculateAge(bday));
+
             const peerInfo = {
                 uuid: msg.senderUuid,
                 username: msg.senderName || 'Classmate',
                 department: msg.senderDept || '',
+                bio: msg.senderBio !== undefined ? msg.senderBio : (existingPeerIdx >= 0 ? data.peers[existingPeerIdx].bio || '' : ''),
+                birthday: bday,
+                age: peerAge,
                 ip: msg.senderIp || (existingPeerIdx >= 0 ? data.peers[existingPeerIdx].ip : ''),
                 port: msg.senderPort || 8765,
                 connectionType: msg.connectionType || (existingPeerIdx >= 0 ? data.peers[existingPeerIdx].connectionType : 'Intranet Peer'),
@@ -288,13 +321,16 @@ function setupIPC() {
         return vault.save(data);
     });
 
-    ipcMain.handle('vault:login', async (event, { username, department }) => {
+    ipcMain.handle('vault:login', async (event, { username, department, bio, birthday }) => {
         const data = vault.load();
         if (!data.peers) data.peers = [];
         if (!data.conversations) data.conversations = {};
 
         data.profile.username = username;
-        data.profile.department = department;
+        if (department !== undefined) data.profile.department = department;
+        if (bio !== undefined) data.profile.bio = bio;
+        if (birthday !== undefined) data.profile.birthday = birthday;
+        data.profile.age = calculateAge(data.profile.birthday);
         data.profile.isLoggedIn = true;
         vault.save(data);
 
@@ -308,6 +344,23 @@ function setupIPC() {
             conversations: data.conversations,
             peers: data.peers,
             networkStatus: { ip: network.localIp, port: network.tcpPort, subnet: network.localSubnet }
+        };
+    });
+
+    ipcMain.handle('vault:update-profile', async (event, { username, department, bio, birthday }) => {
+        const data = vault.load();
+        if (username) data.profile.username = username.trim();
+        if (department !== undefined) data.profile.department = department.trim();
+        if (bio !== undefined) data.profile.bio = bio.trim();
+        if (birthday !== undefined) data.profile.birthday = birthday.trim();
+        data.profile.age = calculateAge(data.profile.birthday);
+        vault.save(data);
+
+        network.updateProfile(data.profile);
+
+        return {
+            success: true,
+            profile: data.profile
         };
     });
 

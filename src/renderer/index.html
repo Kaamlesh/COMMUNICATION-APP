@@ -65,7 +65,26 @@
                             <svg class="input-icon" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
                             <input type="text" id="input-username" placeholder="e.g. Shiva" required autofocus autocomplete="off">
                         </div>
-                        <span class="form-tip">No password needed. Your chats are safely encrypted on this laptop.</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="input-birthday">Your Birthday <span class="label-optional">(Calculates your age for classmates)</span></label>
+                        <div class="input-wrapper">
+                            <svg class="input-icon" viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z"/></svg>
+                            <input type="date" id="input-birthday">
+                        </div>
+                        <div id="login-age-preview" class="age-badge-preview hidden">
+                            <span class="cake-emoji">🎂</span> <span id="login-age-val"></span>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="input-bio">About You / Bio <span class="label-optional">(Optional)</span></label>
+                        <div class="input-wrapper">
+                            <svg class="input-icon" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+                            <input type="text" id="input-bio" placeholder="e.g. AI & DS student | Hostel 4 | Tech enthusiast" autocomplete="off">
+                        </div>
+                        <span class="form-tip">No password needed. Your identity & chats are safely encrypted on this laptop.</span>
                     </div>
 
                     <div class="network-detect-box">
@@ -142,14 +161,18 @@
                 <div id="active-chat" class="active-chat-state hidden">
                     <!-- Chat Header -->
                     <header class="chat-header">
-                        <div class="header-peer-info">
+                        <div class="header-peer-info" id="chat-peer-info-trigger" title="Click to view full profile">
                             <div class="avatar-circle" id="chat-peer-avatar"></div>
                             <div class="peer-text-details">
                                 <div class="peer-name-row">
                                     <span class="peer-name" id="chat-peer-name"></span>
+                                    <span class="peer-age-pill hidden" id="chat-peer-age"></span>
                                     <span class="chat-link-badge hidden" id="chat-link-badge"></span>
                                 </div>
-                                <div class="peer-status" id="chat-peer-status"></div>
+                                <div class="peer-status-row">
+                                    <span class="peer-status" id="chat-peer-status"></span>
+                                    <span class="peer-header-bio hidden" id="chat-peer-bio"></span>
+                                </div>
                             </div>
                         </div>
 
@@ -289,27 +312,76 @@
         </div>
 
         <!-- ============================================== -->
-        <!-- MODAL 3: LOCAL ENCRYPTED VAULT TRANSPARENCY    -->
+        <!-- MODAL 3: PROFILE SETTINGS & LOCAL ENCRYPTED VAULT -->
         <!-- ============================================== -->
         <div id="modal-vault" class="modal-overlay hidden">
-            <div class="vault-dialog">
+            <div class="vault-dialog profile-modal-dialog">
                 <div class="modal-header">
                     <div class="modal-title-wrap">
-                        <h3>Local Encrypted Storage</h3>
-                        <p>100% stored on this laptop • Zero cloud servers</p>
+                        <h3>My Profile & Vault</h3>
+                        <p>Change your username, bio, and birthday to show your age to classmates</p>
                     </div>
                     <button class="btn-close-modal" id="btn-close-vault-modal">&times;</button>
                 </div>
 
                 <div class="modal-content">
+                    <!-- Profile Edit Card -->
+                    <div class="profile-card-section">
+                        <div class="profile-header-preview">
+                            <div class="avatar-circle avatar-large" id="profile-preview-avatar">S</div>
+                            <div class="profile-header-meta">
+                                <h4 id="profile-preview-name">Your Name</h4>
+                                <div class="profile-age-chip" id="profile-age-display">
+                                    <span class="cake-emoji">🎂</span> <span id="profile-age-text">Set birthday to calculate age</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <form id="form-edit-profile" class="profile-edit-form">
+                            <div class="form-group">
+                                <label for="profile-username">User Name</label>
+                                <div class="input-wrapper">
+                                    <svg class="input-icon" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                                    <input type="text" id="profile-username" placeholder="Change your user name" required autocomplete="off">
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="profile-birthday">Birthday <span class="label-optional">(Age is automatically calculated & shown to other users)</span></label>
+                                <div class="input-wrapper">
+                                    <svg class="input-icon" viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z"/></svg>
+                                    <input type="date" id="profile-birthday">
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="profile-bio">Bio / About You <span class="label-optional">(Shown to other classmates on campus)</span></label>
+                                <div class="input-wrapper">
+                                    <textarea id="profile-bio" rows="2" placeholder="e.g. AI & DS student | Tech enthusiast | Hostel 4" autocomplete="off"></textarea>
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn-primary-action" id="btn-save-profile">
+                                <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                                <span>Save & Update Profile</span>
+                            </button>
+                            <div class="profile-feedback-text" id="profile-save-feedback"></div>
+                        </form>
+                    </div>
+
+                    <!-- Divider -->
+                    <div class="modal-section-divider">
+                        <span>Local Vault & Privacy Security</span>
+                    </div>
+
                     <div class="vault-stats-grid">
                         <div class="stat-card">
-                            <span class="stat-label">Encryption Algorithm</span>
+                            <span class="stat-label">Encryption</span>
                             <span class="stat-value">AES-256-GCM</span>
                         </div>
                         <div class="stat-card">
-                            <span class="stat-label">Device Key Derivation</span>
-                            <span class="stat-value">PBKDF2 (100k iter)</span>
+                            <span class="stat-label">Device Key</span>
+                            <span class="stat-value">PBKDF2 (100k)</span>
                         </div>
                         <div class="stat-card">
                             <span class="stat-label">Storage Location</span>
@@ -329,6 +401,78 @@
                         <button class="btn-vault-action danger" id="btn-logout">
                             <svg viewBox="0 0 24 24"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
                             <span>Logout / Switch User</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- MODAL 5: CLASSMATE PROFILE POPUP               -->
+        <!-- ============================================== -->
+        <div id="modal-peer-profile" class="modal-overlay hidden">
+            <div class="peer-profile-dialog">
+                <div class="modal-header">
+                    <div class="modal-title-wrap">
+                        <h3>Classmate Profile</h3>
+                        <p>Verified campus intranet classmate</p>
+                    </div>
+                    <button class="btn-close-modal" id="btn-close-peer-profile-modal">&times;</button>
+                </div>
+                <div class="modal-content">
+                    <div class="peer-profile-header">
+                        <div class="avatar-circle avatar-extra-large" id="modal-peer-avatar">P</div>
+                        <div class="peer-profile-header-info">
+                            <div class="peer-profile-name-row">
+                                <h2 class="peer-profile-fullname" id="modal-peer-name">Classmate</h2>
+                                <span class="peer-age-pill" id="modal-peer-age-pill"></span>
+                            </div>
+                            <div class="peer-profile-status-badge" id="modal-peer-status-badge">Online Now</div>
+                        </div>
+                    </div>
+
+                    <!-- Age & Birthday Card -->
+                    <div class="profile-detail-card highlight-card">
+                        <div class="detail-card-icon">🎂</div>
+                        <div class="detail-card-content">
+                            <span class="detail-card-label">Age & Birthday</span>
+                            <span class="detail-card-val primary" id="modal-peer-age-text">Not provided</span>
+                            <span class="detail-card-sub" id="modal-peer-bday-text"></span>
+                        </div>
+                    </div>
+
+                    <!-- Bio Card -->
+                    <div class="profile-detail-card" id="modal-peer-bio-card">
+                        <div class="detail-card-icon">💬</div>
+                        <div class="detail-card-content">
+                            <span class="detail-card-label">About / Bio</span>
+                            <span class="detail-card-val bio-quote" id="modal-peer-bio-text">No bio yet</span>
+                        </div>
+                    </div>
+
+                    <!-- Campus Network Info -->
+                    <div class="profile-detail-card">
+                        <div class="detail-card-icon">📡</div>
+                        <div class="detail-card-content">
+                            <span class="detail-card-label">Intranet Connection</span>
+                            <span class="detail-card-val" id="modal-peer-ip-text">192.168.43.x:8765</span>
+                            <span class="detail-card-sub" id="modal-peer-conn-type">LAN ↔ LAN</span>
+                        </div>
+                    </div>
+
+                    <!-- Quick action buttons -->
+                    <div class="peer-profile-actions">
+                        <button class="peer-action-btn" id="btn-peer-modal-chat">
+                            <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+                            <span>Chat</span>
+                        </button>
+                        <button class="peer-action-btn" id="btn-peer-modal-call">
+                            <svg viewBox="0 0 24 24"><path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56a.977.977 0 00-1.01.24l-1.57 1.97c-2.83-1.35-5.43-3.9-6.82-6.82l1.97-1.57c.27-.24.35-.61.24-1.01-.36-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/></svg>
+                            <span>Call</span>
+                        </button>
+                        <button class="peer-action-btn" id="btn-peer-modal-video">
+                            <svg viewBox="0 0 24 24"><path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/></svg>
+                            <span>Video</span>
                         </button>
                     </div>
                 </div>

@@ -93,6 +93,11 @@ class StorageVault {
             decrypted += decipher.final('utf8');
 
             const data = JSON.parse(decrypted);
+            if (data.profile) {
+                if (data.profile.bio === undefined) data.profile.bio = '';
+                if (data.profile.birthday === undefined) data.profile.birthday = '';
+                if (data.profile.age === undefined) data.profile.age = null;
+            }
             return data;
         } catch (err) {
             console.warn('[Vault] Decryption failed or new vault initialized:', err.message);
@@ -105,11 +110,14 @@ class StorageVault {
             profile: {
                 username: '',
                 department: 'AI & DS',
+                bio: '',
+                birthday: '',
+                age: null,
                 avatarSeed: Math.floor(Math.random() * 10000),
                 uuid: crypto.randomUUID(),
                 isLoggedIn: false
             },
-            peers: [],          // [{ uuid, username, department, ip, port, lastSeen }]
+            peers: [],          // [{ uuid, username, department, bio, birthday, age, ip, port, lastSeen }]
             conversations: {},  // { [peerUuid]: [ { msgId, senderUuid, senderName, text, time, isOutgoing, file } ] }
             settings: {
                 theme: 'dark',

@@ -2171,3 +2171,406 @@ body {
     font-size: 11px;
     font-weight: 600;
 }
+
+/* ==========================================================================
+   User Profile, Birthday & Age Badges Aesthetic Styling
+   ========================================================================== */
+
+.label-optional {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: normal;
+    margin-left: 4px;
+}
+
+/* Age Pill (Used in Peer List, Chat Header & Modals) */
+.peer-age-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: linear-gradient(135deg, rgba(82, 136, 193, 0.25) 0%, rgba(138, 92, 246, 0.25) 100%);
+    border: 1px solid rgba(82, 136, 193, 0.4);
+    color: #c4d9fd;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+    white-space: nowrap;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+    vertical-align: middle;
+}
+
+.peer-age-pill:empty {
+    display: none;
+}
+
+.peer-top-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    overflow: hidden;
+}
+
+.peer-item-name {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 1;
+}
+
+.peer-bottom-row {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow: hidden;
+}
+
+.peer-item-bio-line {
+    font-size: 11px;
+    color: var(--accent-blue);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-style: italic;
+}
+
+/* Login Age Preview */
+.age-badge-preview {
+    margin-top: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(82, 136, 193, 0.15);
+    border: 1px solid rgba(82, 136, 193, 0.35);
+    color: var(--accent-blue-hover);
+    padding: 6px 12px;
+    border-radius: var(--radius-md);
+    font-size: 12px;
+    font-weight: 600;
+    animation: fadeIn 0.2s ease-out;
+}
+
+.cake-emoji {
+    font-size: 14px;
+}
+
+/* Chat Header Clickable Peer Trigger */
+#chat-peer-info-trigger {
+    cursor: pointer;
+    border-radius: var(--radius-md);
+    padding: 4px 8px;
+    margin: -4px -8px;
+    transition: background var(--transition-fast);
+}
+
+#chat-peer-info-trigger:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.peer-name-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.peer-sub-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    overflow: hidden;
+}
+
+.peer-header-bio {
+    font-size: 12px;
+    color: var(--text-secondary);
+    max-width: 320px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    border-left: 1px solid var(--border-subtle);
+    padding-left: 8px;
+    font-style: italic;
+}
+
+/* Profile Modal Dialog */
+.profile-modal-dialog {
+    max-width: 520px;
+}
+
+.profile-card-section {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.profile-header-preview {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 18px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.avatar-large {
+    width: 60px !important;
+    height: 60px !important;
+    font-size: 24px !important;
+    border: 2px solid var(--accent-blue);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+.avatar-extra-large {
+    width: 72px !important;
+    height: 72px !important;
+    font-size: 28px !important;
+    border: 3px solid var(--accent-blue);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+
+.profile-header-meta h4 {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.profile-age-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(82, 136, 193, 0.16);
+    border: 1px solid rgba(82, 136, 193, 0.3);
+    color: #b0cfff;
+    padding: 4px 10px;
+    border-radius: var(--radius-full);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.profile-edit-form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.profile-edit-form .form-group label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+    display: block;
+}
+
+.profile-edit-form textarea {
+    width: 100%;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 13px;
+    resize: none;
+    padding: 8px 10px;
+}
+
+.profile-feedback-text {
+    font-size: 12px;
+    text-align: center;
+    min-height: 18px;
+    font-weight: 600;
+    transition: all var(--transition-fast);
+}
+
+.profile-feedback-text.success {
+    color: var(--online-green);
+}
+
+.profile-feedback-text.error {
+    color: var(--danger-red);
+}
+
+.modal-section-divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    margin: 16px 0 12px;
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+
+.modal-section-divider::before,
+.modal-section-divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.modal-section-divider span {
+    padding: 0 10px;
+}
+
+/* ==========================================================================
+   Classmate Profile Modal Dialog
+   ========================================================================== */
+
+.peer-profile-dialog {
+    max-width: 480px;
+    width: 100%;
+    background: var(--bg-sidebar);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: 0 20px 48px rgba(0, 0, 0, 0.6);
+    animation: modalScaleIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.peer-profile-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: linear-gradient(135deg, rgba(82, 136, 193, 0.15) 0%, rgba(20, 30, 48, 0.4) 100%);
+    padding: 20px;
+    border-bottom: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+.peer-profile-header-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    overflow: hidden;
+}
+
+.peer-profile-name-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.peer-profile-fullname {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.peer-profile-status-badge {
+    font-size: 12px;
+    color: var(--online-green);
+    font-weight: 600;
+}
+
+.profile-detail-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.profile-detail-card.highlight-card {
+    background: linear-gradient(135deg, rgba(82, 136, 193, 0.12) 0%, rgba(138, 92, 246, 0.12) 100%);
+    border-color: rgba(82, 136, 193, 0.3);
+}
+
+.detail-card-icon {
+    font-size: 22px;
+    line-height: 1;
+    padding-top: 2px;
+}
+
+.detail-card-content {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+}
+
+.detail-card-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+}
+
+.detail-card-val {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.detail-card-val.primary {
+    font-size: 16px;
+    font-weight: 700;
+    color: #c4d9fd;
+}
+
+.detail-card-val.bio-quote {
+    font-weight: 400;
+    font-style: italic;
+    color: var(--text-primary);
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.detail-card-sub {
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.peer-profile-actions {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-top: 16px;
+}
+
+.peer-action-btn {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    transition: all var(--transition-fast);
+}
+
+.peer-action-btn svg {
+    width: 20px;
+    height: 20px;
+    fill: var(--accent-blue);
+    transition: transform var(--transition-fast);
+}
+
+.peer-action-btn:hover {
+    background: rgba(82, 136, 193, 0.15);
+    border-color: var(--accent-blue);
+    transform: translateY(-2px);
+}
+
+.peer-action-btn:hover svg {
+    transform: scale(1.1);
+}
+

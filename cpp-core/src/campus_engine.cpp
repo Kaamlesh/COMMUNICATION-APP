@@ -171,7 +171,7 @@ namespace CampusNet {
         return localIP;
     }
 
-    bool Engine::Initialize(const std::string& username, const std::string& department, int tcpPort) {
+    bool Engine::Initialize(const std::string& username, const std::string& department, int tcpPort, const std::string& bio, const std::string& birthday, int age) {
         WSADATA wsa;
         if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) {
             return false;
@@ -180,6 +180,9 @@ namespace CampusNet {
         m_tcpPort = tcpPort;
         m_selfInfo.username = username;
         m_selfInfo.department = department;
+        m_selfInfo.bio = bio;
+        m_selfInfo.birthday = birthday;
+        m_selfInfo.age = age;
         m_selfInfo.ip = DetectLocalIP();
         m_selfInfo.port = m_tcpPort;
         m_selfInfo.lastSeenMs = GetCurrentTimeMs();
@@ -262,9 +265,12 @@ namespace CampusNet {
         WSACleanup();
     }
 
-    void Engine::UpdateProfile(const std::string& username, const std::string& department) {
+    void Engine::UpdateProfile(const std::string& username, const std::string& department, const std::string& bio, const std::string& birthday, int age) {
         m_selfInfo.username = username;
         m_selfInfo.department = department;
+        if (!bio.empty()) m_selfInfo.bio = bio;
+        if (!birthday.empty()) m_selfInfo.birthday = birthday;
+        if (age > 0) m_selfInfo.age = age;
         BroadcastPresence();
     }
 
@@ -283,6 +289,9 @@ namespace CampusNet {
            << "\"uuid\":\"" << m_selfInfo.uuid << "\","
            << "\"username\":\"" << m_selfInfo.username << "\","
            << "\"dept\":\"" << m_selfInfo.department << "\","
+           << "\"bio\":\"" << m_selfInfo.bio << "\","
+           << "\"birthday\":\"" << m_selfInfo.birthday << "\","
+           << "\"age\":" << m_selfInfo.age << ","
            << "\"port\":" << m_selfInfo.port << "}";
         std::string payload = ss.str();
 
@@ -356,6 +365,10 @@ namespace CampusNet {
                         peer.uuid = uuid;
                         peer.username = ExtractJsonField(packet, "username");
                         peer.department = ExtractJsonField(packet, "dept");
+                        peer.bio = ExtractJsonField(packet, "bio");
+                        peer.birthday = ExtractJsonField(packet, "birthday");
+                        std::string ageStr = ExtractJsonField(packet, "age");
+                        peer.age = ageStr.empty() ? 0 : std::stoi(ageStr);
                         peer.ip = senderIp;
                         std::string portStr = ExtractJsonField(packet, "port");
                         peer.port = portStr.empty() ? DEFAULT_TCP_PORT : std::stoi(portStr);
@@ -447,6 +460,9 @@ namespace CampusNet {
            << "\"uuid\":\"" << m_selfInfo.uuid << "\","
            << "\"username\":\"" << m_selfInfo.username << "\","
            << "\"dept\":\"" << m_selfInfo.department << "\","
+           << "\"bio\":\"" << m_selfInfo.bio << "\","
+           << "\"birthday\":\"" << m_selfInfo.birthday << "\","
+           << "\"age\":" << m_selfInfo.age << ","
            << "\"port\":" << m_selfInfo.port << "}\n";
 
         std::string msg = ss.str();
@@ -466,6 +482,10 @@ namespace CampusNet {
                     peer.uuid = uuid;
                     peer.username = ExtractJsonField(reply, "username");
                     peer.department = ExtractJsonField(reply, "dept");
+                    peer.bio = ExtractJsonField(reply, "bio");
+                    peer.birthday = ExtractJsonField(reply, "birthday");
+                    std::string ageStr = ExtractJsonField(reply, "age");
+                    peer.age = ageStr.empty() ? 0 : std::stoi(ageStr);
 
                     sockaddr_in peerAddr;
                     int peerLen = sizeof(peerAddr);
@@ -546,6 +566,10 @@ namespace CampusNet {
                 peer.uuid = uuid;
                 peer.username = ExtractJsonField(packet, "username");
                 peer.department = ExtractJsonField(packet, "dept");
+                peer.bio = ExtractJsonField(packet, "bio");
+                peer.birthday = ExtractJsonField(packet, "birthday");
+                std::string ageStr = ExtractJsonField(packet, "age");
+                peer.age = ageStr.empty() ? 0 : std::stoi(ageStr);
                 peer.ip = clientIp;
                 std::string portStr = ExtractJsonField(packet, "port");
                 peer.port = portStr.empty() ? DEFAULT_TCP_PORT : std::stoi(portStr);
@@ -568,6 +592,9 @@ namespace CampusNet {
                << "\"uuid\":\"" << m_selfInfo.uuid << "\","
                << "\"username\":\"" << m_selfInfo.username << "\","
                << "\"dept\":\"" << m_selfInfo.department << "\","
+               << "\"bio\":\"" << m_selfInfo.bio << "\","
+               << "\"birthday\":\"" << m_selfInfo.birthday << "\","
+               << "\"age\":" << m_selfInfo.age << ","
                << "\"port\":" << m_selfInfo.port << "}\n";
             std::string reply = ss.str();
             send(clientSock, reply.c_str(), (int)reply.size(), 0);

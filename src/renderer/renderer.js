@@ -44,6 +44,10 @@ const DOM = {
     // Login Form
     loginForm: document.getElementById('login-form'),
     inputUsername: document.getElementById('input-username'),
+    inputBirthday: document.getElementById('input-birthday'),
+    inputBio: document.getElementById('input-bio'),
+    loginAgePreview: document.getElementById('login-age-preview'),
+    loginAgeVal: document.getElementById('login-age-val'),
     loginDetectedIp: document.getElementById('login-detected-ip'),
 
     // Sidebar
@@ -55,8 +59,11 @@ const DOM = {
     // Chat Area
     noChatSelected: document.getElementById('no-chat-selected'),
     activeChat: document.getElementById('active-chat'),
+    chatPeerInfoTrigger: document.getElementById('chat-peer-info-trigger'),
     chatPeerAvatar: document.getElementById('chat-peer-avatar'),
     chatPeerName: document.getElementById('chat-peer-name'),
+    chatPeerAge: document.getElementById('chat-peer-age'),
+    chatPeerBio: document.getElementById('chat-peer-bio'),
     chatLinkBadge: document.getElementById('chat-link-badge'),
     chatPeerStatus: document.getElementById('chat-peer-status'),
     chatMessages: document.getElementById('chat-messages'),
@@ -116,8 +123,65 @@ const DOM = {
     vaultStatSize: document.getElementById('vault-stat-size'),
     btnOpenDownloads: document.getElementById('btn-open-downloads'),
     btnLogout: document.getElementById('btn-logout'),
-    btnUserMenu: document.getElementById('btn-user-menu')
+    btnUserMenu: document.getElementById('btn-user-menu'),
+
+    // Profile Settings inside Modal
+    formEditProfile: document.getElementById('form-edit-profile'),
+    profileUsername: document.getElementById('profile-username'),
+    profileBirthday: document.getElementById('profile-birthday'),
+    profileBio: document.getElementById('profile-bio'),
+    profilePreviewAvatar: document.getElementById('profile-preview-avatar'),
+    profilePreviewName: document.getElementById('profile-preview-name'),
+    profileAgeDisplay: document.getElementById('profile-age-display'),
+    profileAgeText: document.getElementById('profile-age-text'),
+    profileSaveFeedback: document.getElementById('profile-save-feedback'),
+    btnSaveProfile: document.getElementById('btn-save-profile'),
+
+    // Classmate Profile Popup Modal
+    modalPeerProfile: document.getElementById('modal-peer-profile'),
+    btnClosePeerProfileModal: document.getElementById('btn-close-peer-profile-modal'),
+    modalPeerAvatar: document.getElementById('modal-peer-avatar'),
+    modalPeerName: document.getElementById('modal-peer-name'),
+    modalPeerAgePill: document.getElementById('modal-peer-age-pill'),
+    modalPeerStatusBadge: document.getElementById('modal-peer-status-badge'),
+    modalPeerAgeText: document.getElementById('modal-peer-age-text'),
+    modalPeerBdayText: document.getElementById('modal-peer-bday-text'),
+    modalPeerBioCard: document.getElementById('modal-peer-bio-card'),
+    modalPeerBioText: document.getElementById('modal-peer-bio-text'),
+    modalPeerIpText: document.getElementById('modal-peer-ip-text'),
+    modalPeerConnType: document.getElementById('modal-peer-conn-type'),
+    btnPeerModalChat: document.getElementById('btn-peer-modal-chat'),
+    btnPeerModalCall: document.getElementById('btn-peer-modal-call'),
+    btnPeerModalVideo: document.getElementById('btn-peer-modal-video')
 };
+
+function calculateAge(birthdayStr) {
+    if (!birthdayStr) return null;
+    try {
+        const birthDate = new Date(birthdayStr);
+        if (isNaN(birthDate.getTime())) return null;
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+            age--;
+        }
+        return age >= 0 ? age : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function formatBirthday(birthdayStr) {
+    if (!birthdayStr) return '';
+    try {
+        const d = new Date(birthdayStr);
+        if (isNaN(d.getTime())) return '';
+        return d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+    } catch (e) {
+        return '';
+    }
+}
 
 // ==========================================
 // Initialization & Lifecycle
@@ -158,8 +222,19 @@ async function loadInitialVaultData() {
                 showChatView();
                 return;
             } else if (vaultData.profile && vaultData.profile.username) {
-                // If explicitly logged out, pre-fill their previous username
+                // If explicitly logged out, pre-fill their previous profile
                 DOM.inputUsername.value = vaultData.profile.username;
+                if (vaultData.profile.birthday && DOM.inputBirthday) {
+                    DOM.inputBirthday.value = vaultData.profile.birthday;
+                    const age = calculateAge(vaultData.profile.birthday);
+                    if (age !== null && DOM.loginAgeVal && DOM.loginAgePreview) {
+                        DOM.loginAgeVal.textContent = `Age: ${age} years old`;
+                        DOM.loginAgePreview.classList.remove('hidden');
+                    }
+                }
+                if (vaultData.profile.bio && DOM.inputBio) {
+                    DOM.inputBio.value = vaultData.profile.bio;
+                }
             }
         }
         showLoginView();
@@ -315,14 +390,28 @@ function showChatView() {
 // ==========================================
 // Login Handler
 // ==========================================
+if (DOM.inputBirthday) {
+    DOM.inputBirthday.addEventListener('input', () => {
+        const age = calculateAge(DOM.inputBirthday.value);
+        if (age !== null && DOM.loginAgeVal && DOM.loginAgePreview) {
+            DOM.loginAgeVal.textContent = `Age: ${age} years old`;
+            DOM.loginAgePreview.classList.remove('hidden');
+        } else if (DOM.loginAgePreview) {
+            DOM.loginAgePreview.classList.add('hidden');
+        }
+    });
+}
+
 DOM.loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const username = DOM.inputUsername.value.trim();
+    const birthday = DOM.inputBirthday ? DOM.inputBirthday.value : '';
+    const bio = DOM.inputBio ? DOM.inputBio.value.trim() : '';
 
     if (!username) return;
 
     try {
-        const res = await window.campusAPI.login(username, '');
+        const res = await window.campusAPI.login(username, '', bio, birthday);
         if (res.success) {
             state.profile = res.profile;
             state.networkStatus = res.networkStatus;
@@ -504,6 +593,10 @@ function renderPeerList() {
         const connType = isOnline ? (peer.connectionType || 'LAN ↔ LAN') : 'Offline';
         const connClass = isOnline ? getTopologyBadgeClass(connType) : 'conn-offline';
 
+        const peerAge = (peer.age !== undefined && peer.age !== null) ? peer.age : calculateAge(peer.birthday);
+        const agePillHtml = peerAge !== null ? `<span class="peer-age-pill">🎂 ${peerAge} yrs</span>` : '';
+        const bioHtml = peer.bio ? `<span class="peer-item-bio-line">"${escapeHtml(peer.bio)}"</span>` : '';
+
         item.innerHTML = `
             <div class="peer-avatar-wrapper">
                 <div class="avatar-circle" style="background: ${getAvatarColor(peer.username)}">${initial}</div>
@@ -512,10 +605,12 @@ function renderPeerList() {
             <div class="peer-details">
                 <div class="peer-top-row">
                     <span class="peer-item-name">${escapeHtml(peer.username)}</span>
+                    ${agePillHtml}
                     <span class="peer-link-badge ${connClass}">${connType}</span>
                 </div>
                 <div class="peer-bottom-row">
                     <span class="peer-last-msg">${escapeHtml(lastMsg)}</span>
+                    ${bioHtml}
                 </div>
             </div>
         `;
@@ -555,6 +650,27 @@ function updateActiveChatHeader(peer) {
     DOM.chatPeerAvatar.textContent = initial;
     DOM.chatPeerAvatar.style.background = getAvatarColor(peer.username);
     DOM.chatPeerName.textContent = peer.username;
+
+    // Display classmate age if available
+    const peerAge = (peer.age !== undefined && peer.age !== null) ? peer.age : calculateAge(peer.birthday);
+    if (DOM.chatPeerAge) {
+        if (peerAge !== null) {
+            DOM.chatPeerAge.textContent = `🎂 ${peerAge} yrs`;
+            DOM.chatPeerAge.classList.remove('hidden');
+        } else {
+            DOM.chatPeerAge.classList.add('hidden');
+        }
+    }
+
+    // Display classmate bio preview if available
+    if (DOM.chatPeerBio) {
+        if (peer.bio) {
+            DOM.chatPeerBio.textContent = `“${peer.bio}”`;
+            DOM.chatPeerBio.classList.remove('hidden');
+        } else {
+            DOM.chatPeerBio.classList.add('hidden');
+        }
+    }
 
     const isOnline = !!peer.isOnline;
     if (DOM.chatLinkBadge) {
@@ -1367,14 +1483,184 @@ DOM.btnCallToggleCam.addEventListener('click', () => {
 });
 
 // ==========================================
-// Local Encrypted Vault Info Modal
 // ==========================================
+// Classmate Profile Modal Pop-up
+// ==========================================
+function openPeerProfileModal(peer) {
+    if (!peer) return;
+    DOM.modalPeerProfile.classList.remove('hidden');
+
+    const initial = (peer.username || 'P').charAt(0).toUpperCase();
+    DOM.modalPeerAvatar.textContent = initial;
+    DOM.modalPeerAvatar.style.background = getAvatarColor(peer.username);
+    DOM.modalPeerName.textContent = peer.username;
+
+    const isOnline = !!peer.isOnline;
+    DOM.modalPeerStatusBadge.textContent = isOnline ? '● Online Now' : (peer.lastSeen ? `Last seen ${formatTime(peer.lastSeen)}` : 'Offline');
+    DOM.modalPeerStatusBadge.style.color = isOnline ? 'var(--online-green)' : 'var(--text-secondary)';
+
+    // Age and Birthday
+    const peerAge = (peer.age !== undefined && peer.age !== null) ? peer.age : calculateAge(peer.birthday);
+    if (peerAge !== null) {
+        DOM.modalPeerAgeText.textContent = `Age: ${peerAge} years old`;
+        DOM.modalPeerAgePill.textContent = `🎂 ${peerAge} yrs`;
+        DOM.modalPeerAgePill.classList.remove('hidden');
+        DOM.modalPeerBdayText.textContent = peer.birthday ? `Born: ${formatBirthday(peer.birthday)}` : '';
+    } else {
+        DOM.modalPeerAgeText.textContent = 'Birthday not set by user';
+        DOM.modalPeerAgePill.classList.add('hidden');
+        DOM.modalPeerBdayText.textContent = '';
+    }
+
+    // Bio
+    if (peer.bio) {
+        DOM.modalPeerBioText.textContent = `“${peer.bio}”`;
+        DOM.modalPeerBioCard.classList.remove('hidden');
+    } else {
+        DOM.modalPeerBioText.textContent = 'No bio added yet.';
+    }
+
+    // Network Info
+    DOM.modalPeerIpText.textContent = `${peer.ip || 'Unknown IP'}:${peer.port || 8765}`;
+    DOM.modalPeerConnType.textContent = peer.connectionType || 'Campus Intranet Peer';
+}
+
+if (DOM.chatPeerInfoTrigger) {
+    DOM.chatPeerInfoTrigger.addEventListener('click', () => {
+        if (state.activePeer) {
+            openPeerProfileModal(state.activePeer);
+        }
+    });
+}
+
+if (DOM.btnClosePeerProfileModal) {
+    DOM.btnClosePeerProfileModal.addEventListener('click', () => {
+        DOM.modalPeerProfile.classList.add('hidden');
+    });
+}
+
+if (DOM.btnPeerModalChat) {
+    DOM.btnPeerModalChat.addEventListener('click', () => {
+        DOM.modalPeerProfile.classList.add('hidden');
+        DOM.chatInputText.focus();
+    });
+}
+
+if (DOM.btnPeerModalCall) {
+    DOM.btnPeerModalCall.addEventListener('click', () => {
+        DOM.modalPeerProfile.classList.add('hidden');
+        if (DOM.btnStartAudioCall) DOM.btnStartAudioCall.click();
+    });
+}
+
+if (DOM.btnPeerModalVideo) {
+    DOM.btnPeerModalVideo.addEventListener('click', () => {
+        DOM.modalPeerProfile.classList.add('hidden');
+        if (DOM.btnStartVideoCall) DOM.btnStartVideoCall.click();
+    });
+}
+
+// ==========================================
+// User Profile & Local Encrypted Vault Modal
+// ==========================================
+function updateProfileModalAgeDisplay() {
+    const bdayVal = DOM.profileBirthday ? DOM.profileBirthday.value : '';
+    const age = calculateAge(bdayVal);
+    if (age !== null && DOM.profileAgeText && DOM.profileAgeDisplay) {
+        DOM.profileAgeText.textContent = `🎂 Age: ${age} years old`;
+        DOM.profileAgeDisplay.style.background = 'rgba(82, 136, 193, 0.25)';
+    } else if (DOM.profileAgeText) {
+        DOM.profileAgeText.textContent = 'Set birthday to calculate age';
+        if (DOM.profileAgeDisplay) DOM.profileAgeDisplay.style.background = '';
+    }
+}
+
+if (DOM.profileBirthday) {
+    DOM.profileBirthday.addEventListener('input', updateProfileModalAgeDisplay);
+    DOM.profileBirthday.addEventListener('change', updateProfileModalAgeDisplay);
+}
+
 DOM.btnUserMenu.addEventListener('click', async () => {
     DOM.modalVault.classList.remove('hidden');
+
+    // Populate current profile values
+    if (state.profile) {
+        if (DOM.profileUsername) DOM.profileUsername.value = state.profile.username || '';
+        if (DOM.profileBirthday) DOM.profileBirthday.value = state.profile.birthday || '';
+        if (DOM.profileBio) DOM.profileBio.value = state.profile.bio || '';
+
+        const initial = (state.profile.username || 'U').charAt(0).toUpperCase();
+        if (DOM.profilePreviewAvatar) {
+            DOM.profilePreviewAvatar.textContent = initial;
+            DOM.profilePreviewAvatar.style.background = getAvatarColor(state.profile.username);
+        }
+        if (DOM.profilePreviewName) {
+            DOM.profilePreviewName.textContent = state.profile.username || 'Your Name';
+        }
+        updateProfileModalAgeDisplay();
+    }
+    if (DOM.profileSaveFeedback) DOM.profileSaveFeedback.textContent = '';
+
     const stats = await window.campusAPI.getVaultStats();
     DOM.vaultStatPath.textContent = stats.path;
     DOM.vaultStatSize.textContent = `${(stats.sizeBytes / 1024).toFixed(1)} KB`;
 });
+
+// Profile update save form
+if (DOM.formEditProfile) {
+    DOM.formEditProfile.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const newUsername = DOM.profileUsername.value.trim();
+        const newBirthday = DOM.profileBirthday.value;
+        const newBio = DOM.profileBio.value.trim();
+
+        if (!newUsername) return;
+
+        DOM.btnSaveProfile.disabled = true;
+        const btnSpan = DOM.btnSaveProfile.querySelector('span');
+        if (btnSpan) btnSpan.textContent = 'Saving Profile...';
+
+        try {
+            const res = await window.campusAPI.updateProfile({
+                username: newUsername,
+                bio: newBio,
+                birthday: newBirthday
+            });
+
+            if (res.success) {
+                state.profile = res.profile;
+                const initial = (state.profile.username || 'U').charAt(0).toUpperCase();
+                DOM.myAvatar.textContent = initial;
+                DOM.myAvatar.title = state.profile.username;
+
+                if (DOM.profilePreviewAvatar) {
+                    DOM.profilePreviewAvatar.textContent = initial;
+                    DOM.profilePreviewAvatar.style.background = getAvatarColor(state.profile.username);
+                }
+                if (DOM.profilePreviewName) {
+                    DOM.profilePreviewName.textContent = state.profile.username;
+                }
+                updateProfileModalAgeDisplay();
+
+                playTone(880, 0.1);
+                DOM.profileSaveFeedback.textContent = '✓ Profile saved! Classmates now see your updated profile & age.';
+                DOM.profileSaveFeedback.className = 'profile-feedback-text success';
+
+                setTimeout(() => {
+                    if (DOM.profileSaveFeedback) DOM.profileSaveFeedback.textContent = '';
+                }, 4000);
+
+                renderPeerList();
+            }
+        } catch (err) {
+            DOM.profileSaveFeedback.textContent = 'Failed to update: ' + err.message;
+            DOM.profileSaveFeedback.className = 'profile-feedback-text error';
+        } finally {
+            DOM.btnSaveProfile.disabled = false;
+            if (btnSpan) btnSpan.textContent = 'Save & Update Profile';
+        }
+    });
+}
 
 DOM.btnCloseVaultModal.addEventListener('click', () => DOM.modalVault.classList.add('hidden'));
 

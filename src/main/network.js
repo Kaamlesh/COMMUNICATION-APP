@@ -28,7 +28,10 @@ class NetworkController extends EventEmitter {
         this.profile = {
             uuid: '',
             username: 'Student',
-            department: 'AI & DS'
+            department: 'AI & DS',
+            bio: '',
+            birthday: '',
+            age: null
         };
 
         // uuid -> { uuid, username, department, ip, port, lastSeen, isOnline }
@@ -101,6 +104,23 @@ class NetworkController extends EventEmitter {
         }
 
         return isOutbound ? 'LAN ↔ WAN' : 'WAN ↔ LAN';
+    }
+
+    _calculateAge(birthdayStr) {
+        if (!birthdayStr) return null;
+        try {
+            const birthDate = new Date(birthdayStr);
+            if (isNaN(birthDate.getTime())) return null;
+            const today = new Date();
+            let age = today.getFullYear() - birthDate.getFullYear();
+            const m = today.getMonth() - birthDate.getMonth();
+            if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+                age--;
+            }
+            return age >= 0 ? age : null;
+        } catch (e) {
+            return null;
+        }
     }
 
     _detectNetworkInterfaces() {
@@ -210,7 +230,11 @@ class NetworkController extends EventEmitter {
 
     start(profile, tcpPort = DEFAULT_TCP_PORT) {
         this.running = true;
-        this.profile = profile;
+        this.profile = {
+            ...this.profile,
+            ...profile,
+            age: (profile && profile.age !== undefined && profile.age !== null) ? profile.age : this._calculateAge(profile ? profile.birthday : '')
+        };
         this.tcpPort = tcpPort;
         this._detectNetworkInterfaces();
         this.localSubnet = this._getSubnetPrefix(this.localIp);
@@ -273,6 +297,9 @@ class NetworkController extends EventEmitter {
                             uuid: p.uuid,
                             username: p.username || 'Classmate',
                             department: p.department || '',
+                            bio: p.bio || '',
+                            birthday: p.birthday || '',
+                            age: (p.age !== undefined && p.age !== null) ? p.age : this._calculateAge(p.birthday),
                             ip: p.ip || '',
                             port: p.port || DEFAULT_TCP_PORT,
                             connectionType: p.connectionType || 'Intranet Peer',
@@ -294,8 +321,52 @@ class NetworkController extends EventEmitter {
     }
 
     updateProfile(profile) {
-        this.profile = { ...this.profile, ...profile };
+        const computedAge = (profile.age !== undefined && profile.age !== null) 
+            ? profile.age 
+            : this._calculateAge(profile.birthday || this.profile.birthday);
+
+        this.profile = { 
+            ...this.profile, 
+            ...profile,
+            age: computedAge
+        };
         this.broadcastPresence();
+        this.broadcastProfileUpdate();
+    }
+
+    broadcastProfileUpdate() {
+        const msg = JSON.stringify({
+            type: 'profile_update',
+            uuid: this.profile.uuid,
+            username: this.profile.username,
+            department: this.profile.department,
+            bio: this.profile.bio || '',
+            birthday: this.profile.birthday || '',
+            age: (this.profile.age !== undefined && this.profile.age !== null) ? this.profile.age : this._calculateAge(this.profile.birthday),
+            port: this.tcpPort
+        }) + '\n';
+
+        for (const [remoteIp, socket] of this.activeSockets.entries()) {
+            try {
+                if (socket && !socket.destroyed && socket.writable) {
+                    socket.write(msg);
+                }
+            } catch (e) {}
+        }
+
+        // Also push to known online peers
+        for (const peer of this.peers.values()) {
+            if (peer.ip && peer.isOnline) {
+                const client = new net.Socket();
+                client.setTimeout(1200);
+                client.connect(peer.port || DEFAULT_TCP_PORT, peer.ip, () => {
+                    client.write(msg);
+                    setTimeout(() => { client.destroy(); }, 300);
+                });
+                client.on('error', () => { client.destroy(); });
+                client.on('timeout', () => { client.destroy(); });
+            }
+        }
     }
 
     // ==========================================
@@ -439,14 +510,37 @@ class NetworkController extends EventEmitter {
         const { type } = packet;
         const incomingConnType = this.classifyConnection(this.localIp, remoteIp, false, false);
 
-        if (type === 'pex_sync') {
-            // Gossip / Peer Exchange from another node
-            const { uuid, username, department, port, knownPeers } = packet;
+        if (type === 'profile_update') {
+            const { uuid, username, department, bio, birthday, age, port } = packet;
+            const calcAge = (age !== undefined && age !== null) ? age : this._calculateAge(birthday);
             if (uuid && uuid !== this.profile.uuid) {
                 this._registerPeer({
                     uuid,
                     username,
                     department,
+                    bio: bio || '',
+                    birthday: birthday || '',
+                    age: calcAge,
+                    ip: remoteIp,
+                    port: port || DEFAULT_TCP_PORT,
+                    connectionType: incomingConnType,
+                    lastSeen: Date.now(),
+                    isOnline: true
+                });
+            }
+        }
+        else if (type === 'pex_sync') {
+            // Gossip / Peer Exchange from another node
+            const { uuid, username, department, bio, birthday, age, port, knownPeers } = packet;
+            const calcAge = (age !== undefined && age !== null) ? age : this._calculateAge(birthday);
+            if (uuid && uuid !== this.profile.uuid) {
+                this._registerPeer({
+                    uuid,
+                    username,
+                    department,
+                    bio: bio || '',
+                    birthday: birthday || '',
+                    age: calcAge,
                     ip: remoteIp,
                     port: port || DEFAULT_TCP_PORT,
                     connectionType: incomingConnType,
@@ -476,6 +570,9 @@ class NetworkController extends EventEmitter {
                 uuid: p.uuid,
                 username: p.username,
                 department: p.department,
+                bio: p.bio || '',
+                birthday: p.birthday || '',
+                age: (p.age !== undefined && p.age !== null) ? p.age : this._calculateAge(p.birthday),
                 ip: p.ip,
                 port: p.port,
                 connectionType: p.connectionType
@@ -486,6 +583,9 @@ class NetworkController extends EventEmitter {
                 uuid: this.profile.uuid,
                 username: this.profile.username,
                 department: this.profile.department,
+                bio: this.profile.bio || '',
+                birthday: this.profile.birthday || '',
+                age: (this.profile.age !== undefined && this.profile.age !== null) ? this.profile.age : this._calculateAge(this.profile.birthday),
                 port: this.tcpPort,
                 knownPeers: myPeers
             }) + '\n';
@@ -493,12 +593,16 @@ class NetworkController extends EventEmitter {
             socket.write(reply);
         }
         else if (type === 'pex_sync_reply') {
-            const { uuid, username, department, port, knownPeers } = packet;
+            const { uuid, username, department, bio, birthday, age, port, knownPeers } = packet;
+            const calcAge = (age !== undefined && age !== null) ? age : this._calculateAge(birthday);
             if (uuid && uuid !== this.profile.uuid) {
                 this._registerPeer({
                     uuid,
                     username,
                     department,
+                    bio: bio || '',
+                    birthday: birthday || '',
+                    age: calcAge,
                     ip: remoteIp,
                     port: port || DEFAULT_TCP_PORT,
                     connectionType: incomingConnType,
@@ -522,11 +626,31 @@ class NetworkController extends EventEmitter {
             }
         }
         else if (type === 'chat_msg') {
+            const senderAge = (packet.senderAge !== undefined && packet.senderAge !== null)
+                ? packet.senderAge
+                : this._calculateAge(packet.senderBirthday);
+
+            if (packet.senderUuid && packet.senderUuid !== this.profile.uuid) {
+                this._registerPeer({
+                    uuid: packet.senderUuid,
+                    username: packet.senderName || 'Classmate',
+                    department: packet.senderDept || '',
+                    bio: packet.senderBio || '',
+                    birthday: packet.senderBirthday || '',
+                    age: senderAge,
+                    ip: remoteIp,
+                    isOnline: true
+                });
+            }
+
             this.emit('message-received', {
                 msgId: packet.msgId,
                 senderUuid: packet.senderUuid,
                 senderName: packet.senderName,
                 senderDept: packet.senderDept,
+                senderBio: packet.senderBio || '',
+                senderBirthday: packet.senderBirthday || '',
+                senderAge: senderAge,
                 recipientUuid: this.profile.uuid,
                 text: packet.text,
                 time: packet.time || Date.now(),
@@ -595,10 +719,14 @@ class NetworkController extends EventEmitter {
                 if (packet.type === 'beacon' && packet.uuid !== this.profile.uuid) {
                     const isNew = !this.peers.has(packet.uuid);
                     const connType = this.classifyConnection(this.localIp, rinfo.address, false, false);
+                    const calcAge = packet.age !== undefined && packet.age !== null ? packet.age : this._calculateAge(packet.birthday);
                     const peer = {
                         uuid: packet.uuid,
                         username: packet.username,
                         department: packet.dept,
+                        bio: packet.bio || '',
+                        birthday: packet.birthday || '',
+                        age: calcAge,
                         ip: rinfo.address,
                         port: packet.port || DEFAULT_TCP_PORT,
                         connectionType: connType,
@@ -639,6 +767,9 @@ class NetworkController extends EventEmitter {
             uuid: this.profile.uuid,
             username: this.profile.username,
             dept: this.profile.department,
+            bio: this.profile.bio || '',
+            birthday: this.profile.birthday || '',
+            age: (this.profile.age !== undefined && this.profile.age !== null) ? this.profile.age : this._calculateAge(this.profile.birthday),
             port: this.tcpPort
         }));
 
@@ -705,9 +836,19 @@ class NetworkController extends EventEmitter {
             }
         }
 
+        const bio = peer.bio !== undefined ? peer.bio : (existing?.bio || '');
+        const birthday = peer.birthday !== undefined ? peer.birthday : (existing?.birthday || '');
+        let age = (peer.age !== undefined && peer.age !== null) ? peer.age : (existing?.age !== undefined && existing?.age !== null ? existing.age : null);
+        if (age === null && birthday) {
+            age = this._calculateAge(birthday);
+        }
+
         this.peers.set(peer.uuid, {
             ...existing,
             ...peer,
+            bio,
+            birthday,
+            age,
             connectionType: connType,
             lastSeen: isOnline ? Date.now() : (peer.lastSeen || existing?.lastSeen || 0),
             isOnline: isOnline
@@ -745,6 +886,9 @@ class NetworkController extends EventEmitter {
                     uuid: p.uuid,
                     username: p.username,
                     department: p.department,
+                    bio: p.bio || '',
+                    birthday: p.birthday || '',
+                    age: (p.age !== undefined && p.age !== null) ? p.age : this._calculateAge(p.birthday),
                     ip: p.ip,
                     port: p.port,
                     connectionType: p.connectionType
@@ -755,6 +899,9 @@ class NetworkController extends EventEmitter {
                     uuid: this.profile.uuid,
                     username: this.profile.username,
                     department: this.profile.department,
+                    bio: this.profile.bio || '',
+                    birthday: this.profile.birthday || '',
+                    age: (this.profile.age !== undefined && this.profile.age !== null) ? this.profile.age : this._calculateAge(this.profile.birthday),
                     port: this.tcpPort,
                     knownPeers: myPeers
                 }) + '\n';
@@ -766,10 +913,14 @@ class NetworkController extends EventEmitter {
                     try {
                         const reply = JSON.parse(data.toString('utf8').trim());
                         if (reply.type === 'pex_sync_reply') {
+                            const calcAge = (reply.age !== undefined && reply.age !== null) ? reply.age : this._calculateAge(reply.birthday);
                             this._registerPeer({
                                 uuid: reply.uuid,
                                 username: reply.username,
                                 department: reply.department,
+                                bio: reply.bio || '',
+                                birthday: reply.birthday || '',
+                                age: calcAge,
                                 ip: targetIp,
                                 port: reply.port || DEFAULT_TCP_PORT,
                                 connectionType: connType,
@@ -975,11 +1126,17 @@ class NetworkController extends EventEmitter {
 
             // 1. Check if we already hold an open bi-directional TCP socket to this peer (NAT/Firewall traversal)
             const cachedSocket = this.activeSockets?.get(cleanTarget);
+            const enrichedMessage = {
+                senderBio: this.profile.bio || '',
+                senderBirthday: this.profile.birthday || '',
+                senderAge: (this.profile.age !== undefined && this.profile.age !== null) ? this.profile.age : this._calculateAge(this.profile.birthday),
+                ...messageData
+            };
             if (cachedSocket && !cachedSocket.destroyed && cachedSocket.writable) {
                 try {
                     const payload = JSON.stringify({
                         type: 'chat_msg',
-                        ...messageData
+                        ...enrichedMessage
                     }) + '\n';
                     cachedSocket.write(payload);
                     return resolve(true);
@@ -995,7 +1152,7 @@ class NetworkController extends EventEmitter {
             client.connect(targetPort, targetIp, () => {
                 const payload = JSON.stringify({
                     type: 'chat_msg',
-                    ...messageData
+                    ...enrichedMessage
                 }) + '\n';
                 client.write(payload);
             });
